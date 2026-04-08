@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: proyect
+    restart: always
+    environment:
+      POSTGRES_USER: proyect_user
+      POSTGRES_PASSWORD: proyect_password_2026
+      POSTGRES_DB: proyect_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
