@@ -1,0 +1,8 @@
+<svg width="420" height="140" viewBox="0 0 420 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="420" height="140" rx="18" fill="#0E3A45"/>
+  <circle cx="78" cy="70" r="34" fill="#2FBF9B"/>
+  <path d="M63 69C63 61.268 69.268 55 77 55H96V83H77C69.268 83 63 76.732 63 69Z" fill="#0E3A45"/>
+  <path d="M46 89L110 89" stroke="#DDF5EE" stroke-width="6" stroke-linecap="round"/>
+  <text x="132" y="61" fill="#DDF5EE" font-size="24" font-family="Segoe UI, Arial, sans-serif" font-weight="700">Universidad Transport</text>
+  <text x="132" y="92" fill="#9DDDCB" font-size="16" font-family="Segoe UI, Arial, sans-serif">Sistema Centralizado de Robots y Drones</text>
+</svg>

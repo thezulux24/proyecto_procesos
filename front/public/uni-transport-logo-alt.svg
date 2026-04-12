@@ -1,0 +1,9 @@
+<svg width="220" height="64" viewBox="0 0 220 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="46" height="46" rx="12" fill="#FFFFFF" stroke="#D7E3F2" stroke-width="2"/>
+  <path d="M12 25L25 14L38 25V42H12V25Z" fill="#1D57B8"/>
+  <path d="M19 30H31V42H19V30Z" fill="#124390"/>
+  <path d="M25 20L34 27V29H16V27L25 20Z" fill="#EAF2FF"/>
+  <circle cx="25" cy="35" r="2.2" fill="#EAF2FF"/>
+  <text x="58" y="28" fill="#EEF4FF" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">UNI TRANSPORT</text>
+  <text x="58" y="45" fill="#C8D8EE" font-family="Segoe UI, Arial, sans-serif" font-size="10" letter-spacing="1.2">OPERACIONES CENTRALIZADAS</text>
+</svg>
