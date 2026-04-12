@@ -149,7 +149,8 @@ npm run db:setup
 ```
 
 ## Estructura Base
-
+      
+	  
 ```text
 back/
 	prisma/
