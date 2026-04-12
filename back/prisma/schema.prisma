@@ -5,11 +5,172 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum DeviceType {
+  ROBOT
+  DRONE
+}
+
+enum DeviceStatus {
+  AVAILABLE
+  RESERVED
+  IN_SERVICE
+  MAINTENANCE
+  OFFLINE
+}
+
+enum ReservationStatus {
+  REQUESTED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ServiceStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABORTED
+}
+
+enum OperatorRole {
+  ADMIN
+  TECHNICIAN
+  SUPERVISOR
+}
+
+model Role {
+  id           Int      @id @default(autoincrement())
+  nombre       String   @unique
+  descripcion  String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  users        User[]
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  fullName     String
+  passwordHash String
+  roleId       Int?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  role         Role?    @relation(fields: [roleId], references: [id])
+
+  @@index([roleId])
+}
+
+model Operator {
+  id           Int           @id @default(autoincrement())
+  fullName     String
+  email        String        @unique
+  role         OperatorRole  @default(TECHNICIAN)
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  reservations Reservation[]
+  services     ServiceLog[]
+}
+
+model Device {
+  id                Int               @id @default(autoincrement())
+  code              String            @unique
+  name              String
+  type              DeviceType
+  status            DeviceStatus      @default(AVAILABLE)
+  batteryLevel      Int               @default(100)
+  lastKnownLocation String?
+  active            Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  reservations      Reservation[]
+  services          ServiceLog[]
+  telemetry         TelemetrySample[]
+  videos            VideoRecord[]
+}
+
+model Reservation {
+  id            Int               @id @default(autoincrement())
+  object        String
+  deviceType    String            @map("device")
+  requestedBy   String
+  startAt       DateTime
+  endAt         DateTime
+  email         String?
+  status        ReservationStatus @default(ACCEPTED)
+  qrCode        String?
+  qrDataUrl     String?
+  active        Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  deviceId      Int
+  operatorId    Int
+  device        Device            @relation(fields: [deviceId], references: [id])
+  operator      Operator          @relation(fields: [operatorId], references: [id])
+  relatedLogs   ServiceLog[]
+}
+
+model ServiceLog {
+  id                Int            @id @default(autoincrement())
+  startTime         DateTime
+  endTime           DateTime?
+  origin            String
+  destination       String
+  serviceStatus     ServiceStatus  @default(IN_PROGRESS)
+  sensorSummary     String?
+  orderStatus       String?
+  notes             String?
+  active            Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  deviceId          Int
+  operatorId        Int
+  reservationId     Int?
+  device            Device         @relation(fields: [deviceId], references: [id])
+  operator          Operator       @relation(fields: [operatorId], references: [id])
+  reservation       Reservation?   @relation(fields: [reservationId], references: [id])
+  telemetrySamples  TelemetrySample[]
+  videos            VideoRecord[]
+}
+
+model TelemetrySample {
+  id              Int         @id @default(autoincrement())
+  recordedAt      DateTime    @default(now())
+  batteryLevel    Int
+  latitude        Decimal     @db.Decimal(10, 7)
+  longitude       Decimal     @db.Decimal(10, 7)
+  sensorStatus    String
+  payloadStatus   String
+  active          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deviceId        Int
+  serviceLogId    Int?
+  device          Device      @relation(fields: [deviceId], references: [id])
+  serviceLog      ServiceLog? @relation(fields: [serviceLogId], references: [id])
+}
+
+model VideoRecord {
+  id              Int         @id @default(autoincrement())
+  cloudProvider   String
+  cloudUrl        String
+  startedAt       DateTime
+  endedAt         DateTime?
+  active          Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deviceId        Int
+  serviceLogId    Int?
+  device          Device      @relation(fields: [deviceId], references: [id])
+  serviceLog      ServiceLog? @relation(fields: [serviceLogId], references: [id])
 }

@@ -1,0 +1,8 @@
+<svg width="220" height="64" viewBox="0 0 220 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="2" width="44" height="44" rx="12" fill="#FFFFFF" stroke="#D9E5F4" stroke-width="2"/>
+  <path d="M14 30C14 23.3726 19.3726 18 26 18H36V24H26C22.6863 24 20 26.6863 20 30V30C20 33.3137 22.6863 36 26 36H36V42H26C19.3726 42 14 36.6274 14 30Z" fill="#1D57B8"/>
+  <path d="M30 22H36C40.4183 22 44 25.5817 44 30V30C44 34.4183 40.4183 38 36 38H30V22Z" fill="#124390"/>
+  <circle cx="36" cy="30" r="3" fill="#FFFFFF"/>
+  <text x="58" y="28" fill="#EEF4FF" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">UNI TRANSPORT</text>
+  <text x="58" y="45" fill="#C8D8EE" font-family="Segoe UI, Arial, sans-serif" font-size="10" letter-spacing="1.2">SISTEMA CENTRALIZADO</text>
+</svg>

@@ -4,11 +4,11 @@ services:
     container_name: proyect
     restart: always
     environment:
-      POSTGRES_USER: proyect_user
-      POSTGRES_PASSWORD: proyect_password_2026
-      POSTGRES_DB: proyect_db
+      POSTGRES_USER: user_pos
+      POSTGRES_PASSWORD: pos_password_2026
+      POSTGRES_DB: pos_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
