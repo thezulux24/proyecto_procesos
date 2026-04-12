@@ -72,7 +72,7 @@ export default function LoginPage() {
       localStorage.setItem("auth_user", JSON.stringify(data.user));
       document.cookie = `auth_token=${data.accessToken}; Path=/; Max-Age=86400; SameSite=Lax`;
 
-      router.replace("/");
+      router.replace("/resumen");
       router.refresh();
     } catch (submitError) {
       const message =

@@ -275,6 +275,27 @@ export default function ReservasPage() {
     }
   }
 
+  function handleNewReservation() {
+    setShowQrModal(false);
+    setShowConfirmation(false);
+    setConfirmationMessage(null);
+    setError(null);
+    setAssignedUnit(null);
+    setReservationId(null);
+    setQrDataUrl(null);
+    setUserName("");
+    setReservationDate("");
+    setLocation("");
+    setProduct("");
+    setDimensionWidth("");
+    setDimensionHeight("");
+    setWeightKg("");
+    setServiceType("");
+    setEmail("");
+    setPhone("");
+    setDocumentId("");
+  }
+
   if (isAdmin) {
     return (
       <section className="reservation-page">
@@ -546,9 +567,19 @@ export default function ReservasPage() {
               </label>
             </div>
 
-            <button type="submit" className="reservation-button" disabled={isSubmitting}>
-              {isSubmitting ? "Registrando..." : "Registrar reserva"}
-            </button>
+            <div className="reservation-actions">
+              <button type="submit" className="reservation-button" disabled={isSubmitting}>
+                {isSubmitting ? "Registrando..." : "Registrar reserva"}
+              </button>
+              <button
+                type="button"
+                className="reservation-button reservation-button-muted"
+                onClick={handleNewReservation}
+                disabled={isSubmitting}
+              >
+                Nueva reserva
+              </button>
+            </div>
 
             {error ? <p className="reservation-error">{error}</p> : null}
           </form>

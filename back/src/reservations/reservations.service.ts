@@ -78,19 +78,38 @@ export class ReservationsService {
       throw new BadRequestException('No hay operadores activos disponibles para registrar la reserva.');
     }
 
-    // Create the reservation
-    const reservation = await this.prisma.reservation.create({
-      data: {
-        ...baseData,
-        deviceType: normalizedDevice,
-        status: 'ACCEPTED',
-        deviceId: selectedDevice.id,
-        operatorId: selectedOperator.id,
-      },
-      include: {
-        device: true,
-        operator: true,
-      },
+    // Reserve the selected device and create reservation atomically.
+    const reservation = await this.prisma.$transaction(async (tx) => {
+      const reserveResult = await tx.device.updateMany({
+        where: {
+          id: selectedDevice.id,
+          active: true,
+          status: 'AVAILABLE',
+        },
+        data: {
+          status: 'RESERVED',
+        },
+      });
+
+      if (reserveResult.count === 0) {
+        throw new BadRequestException(
+          `El ${expectedDeviceType === 'DRONE' ? 'dron' : 'robot'} seleccionado ya no esta disponible.`,
+        );
+      }
+
+      return tx.reservation.create({
+        data: {
+          ...baseData,
+          deviceType: normalizedDevice,
+          status: 'ACCEPTED',
+          deviceId: selectedDevice.id,
+          operatorId: selectedOperator.id,
+        },
+        include: {
+          device: true,
+          operator: true,
+        },
+      });
     });
 
     try {
@@ -107,6 +126,10 @@ export class ReservationsService {
         data: {
           qrCode: qrCode.toString('base64'),
           qrDataUrl,
+        },
+        include: {
+          device: true,
+          operator: true,
         },
       });
 
@@ -168,10 +191,20 @@ export class ReservationsService {
   }
 
   async remove(id: number) {
-    await this.findOne(id);
-    return this.prisma.reservation.update({
-      where: { id },
-      data: { active: false, status: 'CANCELLED' },
+    const reservation = await this.findOne(id);
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedReservation = await tx.reservation.update({
+        where: { id },
+        data: { active: false, status: 'CANCELLED' },
+      });
+
+      await tx.device.update({
+        where: { id: reservation.deviceId },
+        data: { status: 'AVAILABLE' },
+      });
+
+      return updatedReservation;
     });
   }
 }

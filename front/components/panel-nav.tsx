@@ -9,9 +9,9 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/", label: "Resumen" },
+  { href: "/resumen", label: "Resumen" },
   { href: "/reservas", label: "Reservas" },
-  { href: "#", label: "Dispositivos" },
+  { href: "/dispositivos", label: "Dispositivos" },
   { href: "#", label: "Bitacora" },
   { href: "/operadores", label: "Operadores" },
 ];

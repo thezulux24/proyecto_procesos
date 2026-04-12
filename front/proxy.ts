@@ -8,14 +8,14 @@ export function proxy(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
   const authToken = request.cookies.get("auth_token")?.value;
 
-  if (!authToken && !isPublic) {
+  if (pathname === "/") {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (authToken && pathname === "/login") {
-    const homeUrl = new URL("/", request.url);
-    return NextResponse.redirect(homeUrl);
+  if (!authToken && !isPublic) {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
