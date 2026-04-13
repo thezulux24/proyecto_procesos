@@ -30,6 +30,15 @@ Diagrama general:
 - npm 9+
 - Puerto 5433 disponible para la base de datos de este proyecto
 
+## Variables de Entorno (.env)
+
+Antes de ejecutar `db:setup` y levantar el backend, crea el archivo `back/.env` con el siguiente contenido.
+
+```powershell
+DATABASE_URL="postgresql://user_pos:pos_password_2026@localhost:5433/pos_db?schema=public"
+PORT=3001
+```
+
 ## Instalacion Rapida
 
 1. Levantar base de datos
@@ -47,28 +56,33 @@ cd ../front
 npm install
 ```
 
-3. Configurar base de datos y datos iniciales
+3. Configurar variables de entorno del backend
 
 ```powershell
 cd ../back
+copy .env.example .env
+```
+
+4. Configurar base de datos y datos iniciales
+
+```powershell
 npm run db:setup
 ```
 
-4. Levantar backend
+5. Levantar backend
 
 ```powershell
 npm run start:dev
 ```
 
-5. Levantar frontend (otra terminal)
+6. Levantar frontend (otra terminal)
 
 ```powershell
 cd ../front
 npm run dev
 ```
 
-
-5. Para consultar la base de datos
+7. Para consultar la base de datos
 
 ```powershell
 cd ../back
