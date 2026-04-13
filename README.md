@@ -32,7 +32,7 @@ Diagrama general:
 
 ## Variables de Entorno (.env)
 
-Antes de ejecutar `db:setup` y levantar el backend, crea el archivo `back/.env` con el siguiente contenido.
+Antes de ejecutar y levantar el backend, crea el archivo `back/.env` con el siguiente contenido.
 
 ```powershell
 DATABASE_URL="postgresql://user_pos:pos_password_2026@localhost:5433/pos_db?schema=public"
@@ -52,37 +52,25 @@ docker compose up -d
 ```powershell
 cd back
 npm install
+
 cd ../front
 npm install
 ```
 
-3. Configurar variables de entorno del backend
-
-```powershell
-cd ../back
-copy .env.example .env
-```
-
-4. Configurar base de datos y datos iniciales
-
-```powershell
-npm run db:setup
-```
-
-5. Levantar backend
+3. Levantar backend
 
 ```powershell
 npm run start:dev
 ```
 
-6. Levantar frontend (otra terminal)
+4. Levantar frontend (otra terminal)
 
 ```powershell
 cd ../front
 npm run dev
 ```
 
-7. Para consultar la base de datos
+5. Para consultar la base de datos
 
 ```powershell
 cd ../back
