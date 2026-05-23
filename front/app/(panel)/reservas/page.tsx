@@ -23,6 +23,8 @@ type ReservationListItem = {
   deviceType: string;
   status: string;
   active: boolean;
+  createdAt?: string;
+  email?: string | null;
 };
 
 type AuthUser = {
@@ -54,6 +56,7 @@ export default function ReservasPage() {
   const [documentId, setDocumentId] = useState("");
   const [currentRole, setCurrentRole] = useState<string>("");
   const [reservations, setReservations] = useState<ReservationListItem[]>([]);
+  const [selectedForDelete, setSelectedForDelete] = useState<ReservationListItem | null>(null);
   const [isLoadingReservations, setIsLoadingReservations] = useState(false);
 
   const isAdmin = currentRole === "ADMIN";
@@ -109,19 +112,35 @@ export default function ReservasPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/reservations/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      let response: Response;
+      if (isAdmin) {
+        // Admins use DELETE endpoint
+        response = await fetch(`${API_URL}/reservations/${id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        // Operators use cancellation endpoint which may register a penalty if within 2 hours
+        response = await fetch(`${API_URL}/reservations/${id}/cancel`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
 
       if (!response.ok) {
         throw new Error("No fue posible eliminar la reserva.");
       }
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {}
 
       await loadReservations();
-      setConfirmationMessage(`Reserva #${id} eliminada correctamente.`);
+      const penalty = data?.penalty ? 'Se aplicó una penalidad por cancelación tardía.' : 'Cancelada sin penalidad.';
+      setConfirmationMessage(isAdmin ? `Reserva #${id} eliminada correctamente.` : `Reserva #${id} cancelada. ${penalty}`);
       setShowConfirmation(true);
       setError(null);
     } catch (removeError) {
@@ -208,7 +227,18 @@ export default function ReservasPage() {
       return;
     }
 
-    const startAt = new Date(`${reservationDate}T08:00:00`);
+    // Use the current time for the reservation start time.
+    // If a date is selected, combine that date with the current time; otherwise use now.
+    const now = new Date();
+    let startAt: Date;
+    if (reservationDate) {
+      // create a date from the selected date and set its time to the current time
+      const d = new Date(reservationDate);
+      d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+      startAt = d;
+    } else {
+      startAt = now;
+    }
     const endAt = new Date(startAt);
     endAt.setHours(endAt.getHours() + 1);
 
@@ -341,7 +371,7 @@ export default function ReservasPage() {
                         <button
                           type="button"
                           className="reservation-admin-delete"
-                          onClick={() => removeReservation(item.id)}
+                          onClick={() => setSelectedForDelete(item)}
                         >
                           Eliminar
                         </button>
@@ -354,52 +384,126 @@ export default function ReservasPage() {
           ) : null}
         </article>
 
-        {isClient && showConfirmation && confirmationMessage
-          ? createPortal(
+        {isClient && selectedForDelete &&
+          createPortal(
+            <div
+              className="reservation-modal-backdrop"
+              role="presentation"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 9999,
+                display: 'grid',
+                placeItems: 'center',
+                background: 'rgba(10, 24, 46, 0.45)',
+                padding: '1rem',
+              }}
+            >
               <div
-                className="reservation-modal-backdrop"
-                role="presentation"
+                className="reservation-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="reservation-confirmation-title"
                 style={{
-                  position: "fixed",
-                  inset: 0,
-                  zIndex: 9999,
-                  display: "grid",
-                  placeItems: "center",
-                  background: "rgba(10, 24, 46, 0.45)",
-                  padding: "1rem",
+                  width: 'min(92vw, 520px)',
+                  background: '#ffffff',
+                  border: '1px solid #cfdcf1',
+                  borderRadius: '14px',
+                  padding: '1rem',
+                  boxShadow: '0 20px 44px rgba(16, 34, 58, 0.26)',
                 }}
               >
-                <div
-                  className="reservation-modal"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="reservation-confirmation-title"
-                  style={{
-                    width: "min(92vw, 420px)",
-                    background: "#ffffff",
-                    border: "1px solid #cfdcf1",
-                    borderRadius: "14px",
-                    padding: "1rem",
-                    boxShadow: "0 20px 44px rgba(16, 34, 58, 0.26)",
-                  }}
-                >
-                  <p className="reservation-modal-kicker">Confirmacion</p>
-                  <h3 id="reservation-confirmation-title" className="reservation-modal-title">
-                    Operacion realizada
-                  </h3>
-                  <p className="reservation-modal-message">{confirmationMessage}</p>
+                <p className="reservation-modal-kicker">Confirmación</p>
+                <h3 id="reservation-confirmation-title" className="reservation-modal-title">
+                  Eliminar reserva #{selectedForDelete.id}
+                </h3>
+                <p className="reservation-modal-message">
+                  Creada: {new Date(selectedForDelete.createdAt ?? '').toLocaleString()}
+                </p>
+                <p style={{ marginTop: 8 }}>
+                  {(() => {
+                    const twoHoursMs = 2 * 60 * 60 * 1000;
+                    const created = new Date(selectedForDelete.createdAt ?? selectedForDelete.startAt);
+                    const msSinceCreated = Date.now() - created.getTime();
+                    const willPenalize = msSinceCreated > twoHoursMs;
+                    return willPenalize ? (
+                      <span style={{ color: '#a33' }}>Al eliminar ahora se aplicará una penalidad.</span>
+                    ) : (
+                      <span style={{ color: '#2a6' }}>Al eliminar ahora no se aplicará penalidad.</span>
+                    );
+                  })()}
+                </p>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
                   <button
                     type="button"
-                    className="reservation-modal-button"
-                    onClick={() => setShowConfirmation(false)}
+                    onClick={() => setSelectedForDelete(null)}
+                    style={{ background: '#eef3f8', border: 0, padding: '8px 12px', borderRadius: 8 }}
                   >
-                    Aceptar
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      // perform delete (admin -> DELETE)
+                      await removeReservation(selectedForDelete.id);
+                      setSelectedForDelete(null);
+                    }}
+                    style={{ background: '#c81f1f', color: '#fff', border: 0, padding: '8px 12px', borderRadius: 8 }}
+                  >
+                    Confirmar eliminación
                   </button>
                 </div>
-              </div>,
-              document.body,
-            )
-          : null}
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {isClient && showConfirmation && confirmationMessage &&
+          createPortal(
+            <div
+              className="reservation-modal-backdrop"
+              role="presentation"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 9999,
+                display: 'grid',
+                placeItems: 'center',
+                background: 'rgba(10, 24, 46, 0.45)',
+                padding: '1rem',
+              }}
+            >
+              <div
+                className="reservation-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="reservation-confirmation-title"
+                style={{
+                  width: 'min(92vw, 420px)',
+                  background: '#ffffff',
+                  border: '1px solid #cfdcf1',
+                  borderRadius: '14px',
+                  padding: '1rem',
+                  boxShadow: '0 20px 44px rgba(16, 34, 58, 0.26)',
+                }}
+              >
+                <p className="reservation-modal-kicker">Confirmacion</p>
+                <h3 id="reservation-confirmation-title" className="reservation-modal-title">
+                  Operacion realizada
+                </h3>
+                <p className="reservation-modal-message">{confirmationMessage}</p>
+                <button
+                  type="button"
+                  className="reservation-modal-button"
+                  onClick={() => setShowConfirmation(false)}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>,
+            document.body,
+          )}
       </section>
     );
   }

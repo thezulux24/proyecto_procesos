@@ -39,6 +39,12 @@ export class ReservationsController {
 
   @UseGuards(RolesGuard)
   @Roles('OPERADOR')
+  @Post(':id/cancel')
+  cancel(@Param('id', ParseIntPipe) id: number) {
+    return this.reservationsService.cancel(id);
+  }
+  @UseGuards(RolesGuard)
+  @Roles('OPERADOR')
   @Post()
   create(@Body() body: CreateReservationDto) {
     return this.reservationsService.create(body);

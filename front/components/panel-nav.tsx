@@ -12,7 +12,7 @@ const navItems: NavItem[] = [
   { href: "/resumen", label: "Resumen" },
   { href: "/reservas", label: "Reservas" },
   { href: "/dispositivos", label: "Dispositivos" },
-  { href: "#", label: "Bitacora" },
+  { href: "/bitacora", label: "Bitacora" },
   { href: "/operadores", label: "Operadores" },
 ];
 

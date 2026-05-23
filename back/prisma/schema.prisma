@@ -107,6 +107,7 @@ model Reservation {
   startAt       DateTime
   endAt         DateTime
   email         String?
+  penalty       Boolean           @default(false)
   status        ReservationStatus @default(ACCEPTED)
   qrCode        String?
   qrDataUrl     String?

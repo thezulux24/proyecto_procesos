@@ -21,6 +21,7 @@ export class EmailService {
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
 
+<<<<<<< Updated upstream
     // For development: use ethereal or smtp4dev
     // For production: use real SMTP provider
     if (smtpUrl.includes('ethereal') || !user) {
@@ -32,6 +33,29 @@ export class EmailService {
         secure: process.env.SMTP_SECURE === 'true',
         auth: user && pass ? { user, pass } : undefined,
       });
+=======
+    this.transporter = smtpUrl ? nodemailer.createTransport(smtpUrl) : null;
+    this.resend = !smtpUrl && apiKey ? new Resend(apiKey) : null;
+    this.fromEmail =
+      process.env.SMTP_FROM || process.env.RESEND_FROM_EMAIL || 'sistema@transporte.local';
+
+    // Debug info about configured email provider
+    try {
+      if (this.transporter) {
+        // nodemailer transporter created
+        // eslint-disable-next-line no-console
+        console.log('EmailService: using SMTP transporter:', smtpUrl);
+      } else if (this.resend) {
+        // eslint-disable-next-line no-console
+        console.log('EmailService: using Resend API');
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn('EmailService: no SMTP_URL or RESEND_API_KEY configured; emails will not be sent');
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('EmailService: error while initial log', err);
+>>>>>>> Stashed changes
     }
   }
 
