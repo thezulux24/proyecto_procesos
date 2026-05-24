@@ -88,11 +88,18 @@ Las vistas nuevas quedan en:
 
 ## Correo en Docker
 
-Para revisar los correos locales, levanta Mailpit con Docker:
+Para revisar los correos locales, levanta Mailpit con Docker. 
 
 ```powershell
-docker run -d --name mailpit -p 1025:1025 -p 8025:8025 mailpit/mailpit:latest
+docker run -d --name mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit:latest
 ```
+
+En caso que se indique que el nombre del contenedor ya existe, ejecutar el siguiente comando:
+
+```powershell
+docker rm -f mailpit
+```
+Una vez validado, volver a ejecutar el comando para levantar el contenedor.
 
 Eso deja:
 

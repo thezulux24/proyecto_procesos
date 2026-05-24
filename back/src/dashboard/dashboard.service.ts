@@ -42,6 +42,8 @@ type ServiceLogWithRelations = Prisma.ServiceLogGetPayload<{
   };
 }>;
 
+const DEMO_SERVICE_DURATION_MS = 30 * 1000;
+
 @Injectable()
 export class DashboardService implements OnModuleInit, OnModuleDestroy {
   private readonly snapshotSubject = new Subject<DashboardOverview>();
@@ -198,7 +200,7 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async advanceDemoState() {
-    const activeService = await this.prisma.serviceLog.findFirst({
+    const activeServices = await this.prisma.serviceLog.findMany({
       where: {
         active: true,
         serviceStatus: ServiceStatus.IN_PROGRESS,
@@ -212,79 +214,26 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
         },
         videos: true,
       },
+      orderBy: { id: 'asc' },
     });
 
-    const service = activeService ?? (await this.bootstrapDemoService());
+    const startedServices = await this.bootstrapDemoServices();
+    const servicesToAdvance = [...activeServices, ...startedServices];
 
-    if (!service) {
+    if (servicesToAdvance.length === 0) {
       await this.publishSnapshot();
       return;
     }
 
-    await this.appendTelemetry(service);
+    for (const service of servicesToAdvance) {
+      await this.appendTelemetry(service);
+    }
+
     await this.publishSnapshot();
   }
 
-  private async bootstrapDemoService(): Promise<ServiceLogWithRelations | null> {
-    const reservation = await this.prisma.reservation.findFirst({
-      where: {
-        active: true,
-        status: {
-          in: [ReservationStatus.ACCEPTED, ReservationStatus.REQUESTED],
-        },
-      },
-      include: {
-        device: true,
-        operator: true,
-      },
-      orderBy: { updatedAt: 'asc' },
-    });
-
-    if (reservation && reservation.device && reservation.operator) {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.reservation.update({
-          where: { id: reservation.id },
-          data: { status: ReservationStatus.IN_PROGRESS },
-        });
-
-        await tx.device.update({
-          where: { id: reservation.deviceId },
-          data: { status: DeviceStatus.IN_SERVICE },
-        });
-
-        await tx.serviceLog.create({
-          data: {
-            startTime: new Date(),
-            origin: reservation.device.type === 'DRONE' ? 'Hangar Norte' : 'Bloque Administrativo',
-            destination: reservation.device.type === 'DRONE' ? 'Cobertura en curso' : 'Entrega en curso',
-            serviceStatus: ServiceStatus.IN_PROGRESS,
-            sensorSummary: 'Simulacion automatica inicializada',
-            orderStatus: 'En proceso',
-            notes: 'Servicio levantado automaticamente para el demo',
-            deviceId: reservation.deviceId,
-            operatorId: reservation.operatorId,
-            reservationId: reservation.id,
-          },
-        });
-      });
-
-      return this.prisma.serviceLog.findFirst({
-        where: {
-          reservationId: reservation.id,
-          active: true,
-          serviceStatus: ServiceStatus.IN_PROGRESS,
-        },
-        include: {
-          device: true,
-          operator: true,
-          reservation: true,
-          telemetrySamples: true,
-          videos: true,
-        },
-      });
-    }
-
-    const device = await this.prisma.device.findFirst({
+  private async bootstrapDemoServices(): Promise<ServiceLogWithRelations[]> {
+    const availableDevices = await this.prisma.device.findMany({
       where: {
         active: true,
         status: DeviceStatus.AVAILABLE,
@@ -292,39 +241,86 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
       orderBy: { updatedAt: 'asc' },
     });
 
-    const operator = await this.prisma.operator.findFirst({
+    if (availableDevices.length === 0) {
+      return [];
+    }
+
+    const operators = await this.prisma.operator.findMany({
       where: { active: true },
       orderBy: { updatedAt: 'asc' },
     });
 
-    if (!device || !operator) {
-      return null;
+    if (operators.length === 0) {
+      return [];
     }
 
-    await this.prisma.device.update({
-      where: { id: device.id },
-      data: { status: DeviceStatus.IN_SERVICE },
+    const startedAt = new Date();
+    const queuedDevices = availableDevices;
+
+    const createdServiceIds: number[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      for (let index = 0; index < queuedDevices.length; index += 1) {
+        const device = queuedDevices[index];
+        const operator = operators[index % operators.length];
+        const endedAt = new Date(startedAt.getTime() + DEMO_SERVICE_DURATION_MS);
+
+        await tx.device.update({
+          where: { id: device.id },
+          data: { status: DeviceStatus.IN_SERVICE },
+        });
+
+        const reservation = await tx.reservation.create({
+          data: {
+            object: 'Servicio automatizado demo',
+            deviceType: device.type,
+            requestedBy: 'Sistema demo',
+            startAt: startedAt,
+            endAt: endedAt,
+            email: null,
+            status: ReservationStatus.IN_PROGRESS,
+            deviceId: device.id,
+            operatorId: operator.id,
+          },
+        });
+
+        const service = await tx.serviceLog.create({
+          data: {
+            startTime: startedAt,
+            origin: 'Campus central',
+            destination: device.type === 'DRONE' ? 'Cobertura demo' : 'Ruta demo',
+            serviceStatus: ServiceStatus.IN_PROGRESS,
+            sensorSummary: 'Simulacion automatica inicializada',
+            orderStatus: 'En proceso',
+            notes: 'Servicio de demo asociado a una reserva automatica',
+            deviceId: device.id,
+            operatorId: operator.id,
+            reservationId: reservation.id,
+          },
+        });
+
+        createdServiceIds.push(service.id);
+      }
     });
 
-    return this.prisma.serviceLog.create({
-      data: {
-        startTime: new Date(),
-        origin: 'Campus central',
-        destination: device.type === 'DRONE' ? 'Cobertura demo' : 'Ruta demo',
-        serviceStatus: ServiceStatus.IN_PROGRESS,
-        sensorSummary: 'Simulacion automatica inicializada',
-        orderStatus: 'En proceso',
-        notes: 'Servicio sin reserva creado para el demo',
-        deviceId: device.id,
-        operatorId: operator.id,
+    if (createdServiceIds.length === 0) {
+      return [];
+    }
+
+    return this.prisma.serviceLog.findMany({
+      where: {
+        id: { in: createdServiceIds },
       },
       include: {
         device: true,
         operator: true,
         reservation: true,
-        telemetrySamples: true,
+        telemetrySamples: {
+          orderBy: { recordedAt: 'asc' },
+        },
         videos: true,
       },
+      orderBy: { id: 'asc' },
     });
   }
 
@@ -363,8 +359,10 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
         },
       });
 
-      if (nextBattery <= 25 || sampleCount >= 4) {
-        const finishedAt = new Date();
+      const finishedAt = new Date();
+      const elapsedMs = finishedAt.getTime() - new Date(serviceLog.startTime).getTime();
+
+      if (elapsedMs >= DEMO_SERVICE_DURATION_MS) {
 
         await tx.serviceLog.update({
           where: { id: serviceLog.id },
