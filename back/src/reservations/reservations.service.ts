@@ -200,33 +200,13 @@ export class ReservationsService {
       throw new NotFoundException(`Reservation ${id} not found`);
     }
 
-    const now = new Date();
-    const createdAt = new Date(reservation.createdAt);
-    const msSinceCreated = now.getTime() - createdAt.getTime();
-    const twoHoursMs = 2 * 60 * 60 * 1000;
-    // Penalize if more than 2 hours have passed since creation
-    const penalize = msSinceCreated > twoHoursMs;
+    const updatedReservation: any = await this.deactivateReservation(reservation);
 
-    const updatedReservation = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.reservation.update({
-        where: { id },
-        data: { active: false, status: 'CANCELLED', penalty: penalize },
-        include: { device: true, operator: true },
-      });
-
-      if (reservation.deviceId) {
-        await tx.device.update({ where: { id: reservation.deviceId }, data: { status: 'AVAILABLE' } });
-      }
-
-      return updated;
-    });
-
-    // Notify requester about cancellation and penalty (best-effort)
     try {
       const requesterEmail = updatedReservation.email;
       if (requesterEmail) {
         const subject = `Reserva #${updatedReservation.id} cancelada`;
-        const reason = penalize
+        const reason = updatedReservation.penalty
           ? 'Se le ha aplicado una penalidad por cancelar la reserva con menos de 2 horas de anticipación.'
           : 'Su reserva fue cancelada sin penalidad.';
         const html = `
@@ -241,7 +221,7 @@ export class ReservationsService {
 
         await this.emailService.sendEmail({ to: requesterEmail, subject, html });
         // eslint-disable-next-line no-console
-        console.log(`ReservationService: sent cancellation email to requester ${requesterEmail} for reservation ${updated.id}`);
+        console.log(`ReservationService: sent cancellation email to requester ${requesterEmail} for reservation ${updatedReservation.id}`);
       }
     } catch (err) {
       console.error('Failed to notify requester about reservation deletion', err);
@@ -264,61 +244,40 @@ export class ReservationsService {
       throw new NotFoundException(`Reservation ${id} not found`);
     }
 
-    const now = new Date();
-    const createdAt = new Date(reservation.createdAt);
-    const msSinceCreated = now.getTime() - createdAt.getTime();
-    const twoHoursMs = 2 * 60 * 60 * 1000;
-    // Penalize if more than 2 hours have passed since creation
-    const penalize = msSinceCreated > twoHoursMs;
+    const updatedReservation: any = await this.deactivateReservation(reservation);
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const updatedReservation = await tx.reservation.update({
-        where: { id },
-        data: { active: false, status: 'CANCELLED', penalty: penalize },
-        include: { device: true, operator: true },
-      });
-
-      if (reservation.deviceId) {
-        await tx.device.update({ where: { id: reservation.deviceId }, data: { status: 'AVAILABLE' } });
-      }
-
-      return updatedReservation;
-    });
-
-    // Notify operator (best-effort)
     try {
-      const operator = updated.operator;
-      if (operator && operator.email) {
-        const subject = `Reserva #${updated.id} cancelada`;
-        const reason = penalize ? 'Se aplicó una penalidad por cancelación tardía.' : 'Cancelación sin penalidad.';
+      const operator = updatedReservation.operator;
+      if (operator?.email) {
+        const subject = `Reserva #${updatedReservation.id} cancelada`;
+        const reason = updatedReservation.penalty ? 'Se aplicó una penalidad por cancelación tardía.' : 'Cancelación sin penalidad.';
         const html = `
           <div style="font-family: Arial, sans-serif; max-width: 600px;">
             <h3>Reserva cancelada</h3>
-            <p>La reserva <strong>#${updated.id}</strong> programada para <strong>${new Date(updated.startAt).toLocaleString('es-ES')}</strong> fue cancelada.</p>
+            <p>La reserva <strong>#${updatedReservation.id}</strong> programada para <strong>${new Date(updatedReservation.startAt).toLocaleString('es-ES')}</strong> fue cancelada.</p>
             <p>${reason}</p>
           </div>
         `;
 
         await this.emailService.sendEmail({ to: operator.email, subject, html });
         // eslint-disable-next-line no-console
-        console.log(`ReservationService: sent cancellation email to operator ${operator.email} for reservation ${updated.id}`);
+        console.log(`ReservationService: sent cancellation email to operator ${operator.email} for reservation ${updatedReservation.id}`);
       }
     } catch (err) {
       console.error('Failed to notify operator about reservation cancellation', err);
     }
 
-    // Notify requester about cancellation and penalty (best-effort)
     try {
-      const requesterEmail = updated.email;
+      const requesterEmail = updatedReservation.email;
       if (requesterEmail) {
-        const subject = `Su reserva #${updated.id} ha sido cancelada`;
-        const reason = penalize
+        const subject = `Su reserva #${updatedReservation.id} ha sido cancelada`;
+        const reason = updatedReservation.penalty
           ? 'Se le ha aplicado una penalidad por cancelar la reserva pasado el periodo permitido.'
           : 'Su reserva fue cancelada sin penalidad.';
         const html = `
           <div style="font-family: Arial, sans-serif; max-width: 600px;">
             <h3>Reserva cancelada</h3>
-            <p>La reserva <strong>#${updated.id}</strong> programada para <strong>${new Date(updated.startAt).toLocaleString('es-ES')}</strong> fue cancelada.</p>
+            <p>La reserva <strong>#${updatedReservation.id}</strong> programada para <strong>${new Date(updatedReservation.startAt).toLocaleString('es-ES')}</strong> fue cancelada.</p>
             <p>${reason}</p>
           </div>
         `;
@@ -331,6 +290,35 @@ export class ReservationsService {
       console.error('Failed to notify requester about reservation cancellation', err);
     }
 
-    return updated;
+    return updatedReservation;
+  }
+
+  private async deactivateReservation(reservation: {
+    id: number;
+    createdAt: Date;
+    deviceId: number | null;
+  }) {
+    const now = new Date();
+    const createdAt = new Date(reservation.createdAt);
+    const msSinceCreated = now.getTime() - createdAt.getTime();
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+    const penalize = msSinceCreated > twoHoursMs;
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedReservation = await tx.reservation.update({
+        where: { id: reservation.id },
+        data: { active: false, status: 'CANCELLED', penalty: penalize } as any,
+        include: { device: true, operator: true },
+      });
+
+      if (reservation.deviceId) {
+        await tx.device.update({
+          where: { id: reservation.deviceId },
+          data: { status: 'AVAILABLE' },
+        });
+      }
+
+      return updatedReservation;
+    });
   }
 }

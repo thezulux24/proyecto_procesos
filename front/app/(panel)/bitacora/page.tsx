@@ -182,14 +182,14 @@ export default function Page() {
   }
 
   return (
-    <div style={{ padding: 12 }}>
+    <div style={{ padding: "12px 8px 12px 12px", height: "100%", minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 12, color: "#6b7f95", textTransform: "uppercase", letterSpacing: "0.05em" }}>Bitácora</div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>Registro de servicios</div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginLeft: 20 }}>
+        <div style={{ display: "flex", gap: 8, marginLeft: 16 }}>
           <div style={{ background: "#f4f8ff", padding: 12, borderRadius: 8, minWidth: 140, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
             <div style={{ fontSize: 12, color: "#30475e", marginBottom: 6 }}>Dispositivos disponibles</div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>{devicesCount.available}</div>
@@ -224,8 +224,8 @@ export default function Page() {
       {error ? <div style={{ color: "#a82424" }}>{error}</div> : null}
       {loading ? <div>Cargando...</div> : null}
 
-      <div style={{ display: "block" }}>
-        <div style={{ overflow: "auto" }}>
+      <div style={{ display: "block", flex: 1, minHeight: 0, overflow: "auto", paddingRight: 4 }}>
+        <div style={{ overflow: "auto", maxHeight: "100%", paddingRight: 4 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: "left", borderBottom: "1px solid #eef5fb" }}>

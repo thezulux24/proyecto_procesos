@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 interface EmailOptions {
@@ -14,49 +14,19 @@ interface EmailOptions {
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private readonly transporter: nodemailer.Transporter;
 
   constructor() {
-    const smtpUrl = process.env.SMTP_URL || 'smtp://localhost:1025';
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
+    const smtpUrl = process.env.SMTP_URL;
 
-<<<<<<< Updated upstream
-    // For development: use ethereal or smtp4dev
-    // For production: use real SMTP provider
-    if (smtpUrl.includes('ethereal') || !user) {
+    if (smtpUrl) {
       this.transporter = nodemailer.createTransport(smtpUrl);
-    } else {
-      this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'localhost',
-        port: parseInt(process.env.SMTP_PORT || '1025'),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: user && pass ? { user, pass } : undefined,
-      });
-=======
-    this.transporter = smtpUrl ? nodemailer.createTransport(smtpUrl) : null;
-    this.resend = !smtpUrl && apiKey ? new Resend(apiKey) : null;
-    this.fromEmail =
-      process.env.SMTP_FROM || process.env.RESEND_FROM_EMAIL || 'sistema@transporte.local';
-
-    // Debug info about configured email provider
-    try {
-      if (this.transporter) {
-        // nodemailer transporter created
-        // eslint-disable-next-line no-console
-        console.log('EmailService: using SMTP transporter:', smtpUrl);
-      } else if (this.resend) {
-        // eslint-disable-next-line no-console
-        console.log('EmailService: using Resend API');
-      } else {
-        // eslint-disable-next-line no-console
-        console.warn('EmailService: no SMTP_URL or RESEND_API_KEY configured; emails will not be sent');
-      }
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('EmailService: error while initial log', err);
->>>>>>> Stashed changes
+      return;
     }
+
+    this.transporter = nodemailer.createTransport({
+      jsonTransport: true,
+    });
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {

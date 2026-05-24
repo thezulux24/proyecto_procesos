@@ -1,77 +1,39 @@
 # Sistema Centralizado de Transporte Universitario
 
-<p align="center">
-	<img src="front/public/images/transport-logo.svg" width="420" alt="Logo transporte universitario">
-</p>
-
-Este proyecto implementa un sistema centralizado para gestionar el uso de robots y drones dentro de una universidad.
-
-## Contexto
-
-La universidad cuenta con dispositivos (robots y drones) para servicios internos como:
-
-- Transporte de documentos y pedidos de cafeteria.
-- Grabacion de encuentros artisticos y deportivos.
-
-El objetivo del sistema es eliminar la dependencia de operacion manual por persona y permitir administracion centralizada de inventario, reservas, bitacoras y monitoreo.
-
-## Funcionalidades Minimas Cubiertas
-
-- Administracion de inventario de dispositivos.
-- Sistema de reservas para uso de robots/drones.
-- Bitacora de servicios (inicio, fin, origen, destino, estado).
-- Monitoreo por telemetria (ubicacion, bateria, sensores, estado de carga/servicio).
-- Registro de videos por recorrido con URL en servicio cloud.
-- Soft Delete con campo `active` en entidades de dominio.
-
-## Stack Tecnologico
-
-- Backend: NestJS + Prisma + PostgreSQL
-- Frontend: Next.js (App Router)
-- Infraestructura local: Docker Compose
-
-## Modelo de Datos
-
-Entidades principales:
-
-- Operator
-- Device
-- Reservation
-- ServiceLog
-- TelemetrySample
-- VideoRecord
-
-Diagrama general:
-
-```mermaid
-erDiagram
-		OPERATOR ||--o{ RESERVATION : gestiona
-		OPERATOR ||--o{ SERVICE_LOG : supervisa
-		DEVICE ||--o{ RESERVATION : se_reserva
-		DEVICE ||--o{ SERVICE_LOG : ejecuta
-		RESERVATION ||--o{ SERVICE_LOG : referencia
-		SERVICE_LOG ||--o{ TELEMETRY_SAMPLE : produce
-		SERVICE_LOG ||--o{ VIDEO_RECORD : genera
-		DEVICE ||--o{ TELEMETRY_SAMPLE : reporta
-		DEVICE ||--o{ VIDEO_RECORD : captura
-```
+Guía práctica para ejecutar el proyecto completo: base de datos, backend, frontend, simulación automática, videos demo y correo con Mailpit en Docker.
 
 ## Requisitos
 
-- Docker Desktop en ejecucion
-- Node.js 18+
-- npm 9+
-- Puerto 5433 disponible para la base de datos de este proyecto
+- Node.js 18 o superior.
+- npm 9 o superior.
+- Docker Desktop activo.
+- Puerto `5433` libre para PostgreSQL.
+- Puerto `3000` libre para el frontend.
+- Puerto `3001` libre para el backend.
+- Puerto `1025` libre para Mailpit.
+- Puerto `8025` libre para la interfaz de Mailpit.
 
-## Instalacion Rapida
+## Paso a paso
 
-1. Levantar base de datos
+1. Levanta la base de datos:
 
 ```powershell
 docker compose up -d
 ```
 
-2. Instalar dependencias
+2. En `back/.env`, deja esta configuración mínima para ejecutar todo:
+
+```env
+DATABASE_URL="postgresql://user_pos:pos_password_2026@localhost:5433/pos_db?schema=public"
+PORT=3001
+DEMO_AUTOPILOT=true
+SMTP_URL=smtp://localhost:1025
+SMTP_FROM=sistema@transporte.local
+FRONTEND_URL=http://localhost:3000
+JWT_SECRET=dev-secret
+```
+
+3. Instala dependencias:
 
 ```powershell
 cd back
@@ -80,101 +42,82 @@ cd ../front
 npm install
 ```
 
-3. Configurar base de datos y datos iniciales
+4. Prepara Prisma y la base de datos:
 
 ```powershell
 cd ../back
 npm run db:setup
 ```
 
-4. Levantar backend
+5. Inicia el backend:
 
 ```powershell
 npm run start:dev
 ```
 
-5. Levantar frontend (otra terminal)
+6. En otra terminal, inicia el frontend:
 
 ```powershell
 cd ../front
 npm run dev
 ```
 
-## URLs de Desarrollo
+7. Abre el panel en:
 
-- Frontend: http://localhost:3000
-- Backend: http://localhost:3001
-- Health: http://localhost:3001/
+```text
+http://localhost:3000
+```
 
-## Endpoints Iniciales
+## Simulación automática
 
-### Dispositivos
+La simulación queda activa con `DEMO_AUTOPILOT=true` en `back/.env`.
 
-- GET /devices
-- GET /devices/:id
-- POST /devices
-- PATCH /devices/:id
-- DELETE /devices/:id (soft delete)
+Con eso el backend:
 
-### Reservas
+- Genera actividad demo automáticamente.
+- Registra telemetría.
+- Actualiza batería y estado de dispositivos.
+- Cierra servicios automáticamente.
+- Crea grabaciones de video para servicios completados.
 
-- GET /reservations
-- GET /reservations/:id
-- POST /reservations
-- PATCH /reservations/:id
-- DELETE /reservations/:id (soft delete)
+Las vistas nuevas quedan en:
 
-### Bitacora de Servicios
+- `/resumen`
+- `/grabaciones`
+- `/resumen/video/:videoId`
 
-- GET /service-logs
-- GET /service-logs/:id
-- POST /service-logs
-- PATCH /service-logs/:id
-- DELETE /service-logs/:id (soft delete)
+## Correo en Docker
 
-## Comandos Utiles (Backend)
+Para revisar los correos locales, levanta Mailpit con Docker:
 
 ```powershell
-# Generar cliente Prisma
-npm run prisma:generate
+docker run -d --name mailpit -p 1025:1025 -p 8025:8025 mailpit/mailpit:latest
+```
 
-# Crear/aplicar migraciones
-npm run prisma:migrate
+Eso deja:
 
-# Cargar seed
-npm run prisma:seed
+- SMTP en `localhost:1025`
+- Interfaz web en `http://localhost:8025`
 
-# Flujo completo DB (generate + migrate + seed)
+
+## Datos de prueba
+
+Credenciales creadas por el seed:
+
+- Admin: `admin@universidad.edu` / `admin123456`
+- Operador: `operador@universidad.edu` / `operador123456`
+
+## Si quieres reiniciar todo
+
+```powershell
+cd back
 npm run db:setup
+npm run start:dev
 ```
 
-## Estructura Base
-      
-	  
-```text
-back/
-	prisma/
-		schema.prisma
-		seed.js
-	src/
-		prisma/
-		devices/
-		reservations/
-		service-logs/
-front/
-	app/
-	public/
+En otra terminal:
+
+```powershell
+cd front
+npm run dev
 ```
-
-## Nota de Soft Delete
-
-El sistema evita eliminaciones fisicas en operaciones de dominio. En su lugar:
-
-- Se marca `active = false`
-- Los listados filtran por `active = true` por defecto
-
-## Siguientes Pasos Recomendados
-
-- Agregar autenticacion por roles (ADMIN, TECHNICIAN, SUPERVISOR).
-- Crear modulo de telemetria y modulo de videos con endpoints dedicados.
-- Conectar frontend a los endpoints de inventario y reservas.

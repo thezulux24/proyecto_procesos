@@ -3,11 +3,24 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AuthService } from '../auth.service';
 
+function extractToken(request: any) {
+  const bearerToken = ExtractJwt.fromAuthHeaderAsBearerToken()(request);
+  if (bearerToken) {
+    return bearerToken;
+  }
+
+  if (typeof request?.query?.token === 'string' && request.query.token.trim()) {
+    return request.query.token;
+  }
+
+  return null;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly authService: AuthService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: extractToken,
       ignoreExpiration: false,
       secretOrKey: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
     });

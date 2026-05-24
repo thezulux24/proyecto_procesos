@@ -19,6 +19,41 @@ type OperatorFormState = {
   active: boolean;
 };
 
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 20h4l10.2-10.2a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16v4Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="m13.2 6.8 4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PowerIcon({ active }: { active: boolean }) {
+  return active ? (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3v8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M7.1 5.5a8 8 0 1 0 9.8 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3v8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M7.1 5.5a8 8 0 1 0 9.8 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeDasharray="3 2" />
+      <path d="M9.5 13l5-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7h16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M9 7V5.8A1.8 1.8 0 0 1 10.8 4h2.4A1.8 1.8 0 0 1 15 5.8V7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M7.5 7l.7 11a1.6 1.6 0 0 0 1.6 1.5h4.4a1.6 1.6 0 0 0 1.6-1.5l.7-11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M10 11v5M14 11v5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 const emptyForm: OperatorFormState = {
@@ -337,24 +372,33 @@ export default function OperadoresPage() {
                     <td className="operators-row-actions">
                       <button
                         type="button"
-                        className="operators-link"
+                        className="operators-link operators-icon-button"
                         onClick={() => startEdit(operator)}
+                        aria-label={`Editar ${operator.fullName}`}
+                        title={`Editar ${operator.fullName}`}
                       >
-                        Editar
+                        <EditIcon />
+                        <span className="sr-only">Editar</span>
                       </button>
                       <button
                         type="button"
-                        className="operators-link"
+                        className="operators-link operators-icon-button operators-icon-button-toggle"
                         onClick={() => toggleActive(operator)}
+                        aria-label={operator.active ? `Desactivar ${operator.fullName}` : `Activar ${operator.fullName}`}
+                        title={operator.active ? `Desactivar ${operator.fullName}` : `Activar ${operator.fullName}`}
                       >
-                        {operator.active ? "Desactivar" : "Activar"}
+                        <PowerIcon active={operator.active} />
+                        <span className="sr-only">{operator.active ? "Desactivar" : "Activar"}</span>
                       </button>
                       <button
                         type="button"
-                        className="operators-link operators-link-danger"
+                        className="operators-link operators-icon-button operators-link-danger"
                         onClick={() => removeOperator(operator)}
+                        aria-label={`Eliminar ${operator.fullName}`}
+                        title={`Eliminar ${operator.fullName}`}
                       >
-                        Eliminar
+                        <DeleteIcon />
+                        <span className="sr-only">Eliminar</span>
                       </button>
                     </td>
                   </tr>

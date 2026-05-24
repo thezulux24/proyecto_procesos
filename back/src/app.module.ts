@@ -9,9 +9,10 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { CommonModule } from './common/common.module';
 import { OperatorsModule } from './operators/operators.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
-  imports: [PrismaModule, DevicesModule, ReservationsModule, ServiceLogsModule, AuthModule, UsersModule, CommonModule, OperatorsModule],
+  imports: [PrismaModule, DevicesModule, ReservationsModule, ServiceLogsModule, AuthModule, UsersModule, CommonModule, OperatorsModule, DashboardModule],
   controllers: [AppController],
   providers: [AppService],
 })
