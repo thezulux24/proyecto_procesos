@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { Prisma } from '@prisma/client';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 type AuthUser = Prisma.UserGetPayload<{ include: { role: true } }>;
 
@@ -78,5 +79,51 @@ export class AuthService {
   async hashPassword(password: string): Promise<string> {
     const salt = await bcrypt.genSalt(10);
     return bcrypt.hash(password, salt);
+  }
+
+  generatePasswordResetToken(user: { id: number; email: string; fullName: string }) {
+    return this.jwtService.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        purpose: 'password-reset',
+      },
+      { expiresIn: '48h' },
+    );
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    let payload: { sub?: number; email?: string; purpose?: string };
+
+    try {
+      payload = await this.jwtService.verifyAsync(resetPasswordDto.token, {
+        secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+      });
+    } catch {
+      throw new BadRequestException('Token de restablecimiento invalido o expirado');
+    }
+
+    if (!payload.sub || payload.purpose !== 'password-reset') {
+      throw new BadRequestException('Token de restablecimiento invalido');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { role: true },
+    });
+
+    if (!user || !user.active || !user.role || !user.role.active) {
+      throw new BadRequestException('Usuario no disponible para restablecer contraseña');
+    }
+
+    const passwordHash = await this.hashPassword(resetPasswordDto.password);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    return { message: 'Contraseña actualizada correctamente' };
   }
 }

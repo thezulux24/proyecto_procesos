@@ -4,6 +4,8 @@ import { Subject, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { PrismaService } from '../prisma/prisma.service';
 import { CloudService } from '../cloud/cloud.service';
+import { QrService } from '../common/utils/qr.service';
+import { EmailService } from '../common/utils/email.service';
 
 type DashboardOverview = {
   generatedAt: string;
@@ -42,7 +44,66 @@ type ServiceLogWithRelations = Prisma.ServiceLogGetPayload<{
   };
 }>;
 
+type DeviceMonitoringWithTelemetry = Prisma.DeviceGetPayload<{
+  include: {
+    telemetry: {
+      orderBy: {
+        recordedAt: 'desc';
+      };
+      take: 1;
+    };
+    services: {
+      where: {
+        active: true;
+      };
+      orderBy: {
+        updatedAt: 'desc';
+      };
+      take: 1;
+      include: {
+        operator: true;
+      };
+    };
+  };
+}>;
+
+type MonitoringDevice = {
+  id: number;
+  code: string;
+  name: string;
+  type: string;
+  status: string;
+  batteryLevel: number;
+  lastKnownLocation: string | null;
+  active: boolean;
+  updatedAt: string;
+  latestTelemetryAt: string | null;
+  sensorStatus: string | null;
+  payloadStatus: string | null;
+  currentService: {
+    id: number;
+    operatorName: string | null;
+    status: string;
+  } | null;
+};
+
+type MonitoringOverview = {
+  generatedAt: string;
+  summary: {
+    activeDevices: number;
+    availableDevices: number;
+    inServiceDevices: number;
+    maintenanceDevices: number;
+    offlineDevices: number;
+  };
+  devices: MonitoringDevice[];
+};
+
 const DEMO_SERVICE_DURATION_MS = 30 * 1000;
+const BATTERY_LOW_THRESHOLD = 10;
+const BATTERY_RECOVERY_THRESHOLD = 70;
+const BATTERY_DRAIN_STEP = 6;
+const BATTERY_RECOVERY_STEP = 12;
 
 @Injectable()
 export class DashboardService implements OnModuleInit, OnModuleDestroy {
@@ -52,6 +113,8 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudService: CloudService,
+    private readonly qrService: QrService,
+    private readonly emailService: EmailService,
   ) {}
 
   onModuleInit() {
@@ -149,6 +212,70 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async getMonitoringOverview(): Promise<MonitoringOverview> {
+    const devices = await this.prisma.device.findMany({
+      where: { active: true },
+      orderBy: [{ name: 'asc' }],
+      include: {
+        telemetry: {
+          orderBy: { recordedAt: 'desc' },
+          take: 1,
+        },
+        services: {
+          where: { active: true },
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+          include: {
+            operator: true,
+          },
+        },
+      },
+    }) as DeviceMonitoringWithTelemetry[];
+
+    const activeDevices = devices.length;
+    const availableDevices = devices.filter((device) => device.status === DeviceStatus.AVAILABLE).length;
+    const inServiceDevices = devices.filter((device) => device.status === DeviceStatus.IN_SERVICE).length;
+    const maintenanceDevices = devices.filter((device) => device.status === DeviceStatus.MAINTENANCE).length;
+    const offlineDevices = devices.filter((device) => device.status === DeviceStatus.OFFLINE).length;
+
+    return {
+      generatedAt: new Date().toISOString(),
+      summary: {
+        activeDevices,
+        availableDevices,
+        inServiceDevices,
+        maintenanceDevices,
+        offlineDevices,
+      },
+      devices: devices.map((device) => {
+        const latestTelemetry = device.telemetry[0] ?? null;
+        const currentService = device.services[0] ?? null;
+
+        return {
+          id: device.id,
+          code: device.code,
+          name: device.name,
+          type: device.type,
+          status: device.status,
+          batteryLevel: device.batteryLevel,
+          lastKnownLocation: device.lastKnownLocation,
+          active: device.active,
+          updatedAt: device.updatedAt.toISOString(),
+          latestTelemetryAt: latestTelemetry?.recordedAt.toISOString() ?? null,
+          sensorStatus: latestTelemetry?.sensorStatus ?? null,
+          payloadStatus: latestTelemetry?.payloadStatus ?? null,
+          currentService: currentService
+            ? {
+                id: currentService.id,
+                operatorName: currentService.operator?.fullName ?? null,
+                status: currentService.serviceStatus,
+              }
+            : null,
+        };
+      }),
+    };
+  }
+
   private buildActivityFeed(serviceLogs: any[], reservations: any[], videos: any[]) {
     const items = [
       ...serviceLogs.slice(0, 4).map((serviceLog) => ({
@@ -217,16 +344,28 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
       orderBy: { id: 'asc' },
     });
 
+    const maintenanceDevices = await this.prisma.device.findMany({
+      where: {
+        active: true,
+        status: DeviceStatus.MAINTENANCE,
+      },
+      orderBy: { updatedAt: 'asc' },
+    });
+
     const startedServices = await this.bootstrapDemoServices();
     const servicesToAdvance = [...activeServices, ...startedServices];
 
-    if (servicesToAdvance.length === 0) {
+    if (servicesToAdvance.length === 0 && maintenanceDevices.length === 0) {
       await this.publishSnapshot();
       return;
     }
 
     for (const service of servicesToAdvance) {
       await this.appendTelemetry(service);
+    }
+
+    for (const device of maintenanceDevices) {
+      await this.appendMaintenanceTelemetry(device);
     }
 
     await this.publishSnapshot();
@@ -237,6 +376,9 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
       where: {
         active: true,
         status: DeviceStatus.AVAILABLE,
+        batteryLevel: {
+          gte: BATTERY_RECOVERY_THRESHOLD,
+        },
       },
       orderBy: { updatedAt: 'asc' },
     });
@@ -257,7 +399,13 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
     const startedAt = new Date();
     const queuedDevices = availableDevices;
 
-    const createdServiceIds: number[] = [];
+    const createdServices: Array<{
+      serviceId: number;
+      reservationId: number;
+      operatorEmail: string | null;
+      deviceName: string;
+      startAt: Date;
+    }> = [];
 
     await this.prisma.$transaction(async (tx) => {
       for (let index = 0; index < queuedDevices.length; index += 1) {
@@ -299,17 +447,53 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
           },
         });
 
-        createdServiceIds.push(service.id);
+        createdServices.push({
+          serviceId: service.id,
+          reservationId: reservation.id,
+          operatorEmail: operator.email,
+          deviceName: device.name,
+          startAt: startedAt,
+        });
       }
     });
 
-    if (createdServiceIds.length === 0) {
+    if (createdServices.length === 0) {
       return [];
+    }
+
+    for (const created of createdServices) {
+      try {
+        const { qrCode, qrDataUrl } = await this.qrService.generateReservationQR(
+          String(created.reservationId),
+          created.deviceName,
+          created.startAt,
+        );
+
+        await this.prisma.reservation.update({
+          where: { id: created.reservationId },
+          data: {
+            qrCode: qrCode.toString('base64'),
+            qrDataUrl,
+          },
+        });
+
+        if (created.operatorEmail) {
+          await this.emailService.sendReservationConfirmation(
+            created.operatorEmail,
+            String(created.reservationId),
+            created.deviceName,
+            created.startAt,
+            qrDataUrl,
+          );
+        }
+      } catch (error) {
+        console.error('Failed to send demo reservation confirmation:', error);
+      }
     }
 
     return this.prisma.serviceLog.findMany({
       where: {
-        id: { in: createdServiceIds },
+        id: { in: createdServices.map((service) => service.serviceId) },
       },
       include: {
         device: true,
@@ -330,12 +514,13 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
     }
 
     const sampleCount = serviceLog.telemetrySamples.length;
-    const nextBattery = Math.max(10, serviceLog.device.batteryLevel - (sampleCount >= 3 ? 6 : 3));
+    const nextBattery = Math.max(BATTERY_LOW_THRESHOLD, serviceLog.device.batteryLevel - (sampleCount >= 3 ? BATTERY_DRAIN_STEP : 3));
     const latitude = Number((-6.2589 + sampleCount * 0.00018 + Math.random() * 0.00005).toFixed(7));
     const longitude = Number((-75.5774 + sampleCount * 0.00012 + Math.random() * 0.00005).toFixed(7));
 
     const sensorStatus = nextBattery <= 25 ? 'ATENCION' : sampleCount % 2 === 0 ? 'OK' : 'ESTABLE';
     const payloadStatus = serviceLog.device.type === 'DRONE' ? 'Grabacion en curso' : 'Entrega en curso';
+    const nextStatus = nextBattery <= BATTERY_LOW_THRESHOLD ? DeviceStatus.MAINTENANCE : DeviceStatus.IN_SERVICE;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.telemetrySample.create({
@@ -355,12 +540,37 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
         data: {
           batteryLevel: nextBattery,
           lastKnownLocation: serviceLog.device.type === 'DRONE' ? 'Zona abierta de cobertura' : 'Corredor administrativo',
-          status: nextBattery <= 25 ? DeviceStatus.MAINTENANCE : DeviceStatus.IN_SERVICE,
+          status: nextStatus,
         },
       });
 
       const finishedAt = new Date();
       const elapsedMs = finishedAt.getTime() - new Date(serviceLog.startTime).getTime();
+
+      if (nextBattery <= BATTERY_LOW_THRESHOLD) {
+        await tx.serviceLog.update({
+          where: { id: serviceLog.id },
+          data: {
+            endTime: finishedAt,
+            active: false,
+            serviceStatus: ServiceStatus.ABORTED,
+            orderStatus: 'Suspendido',
+            notes: `${serviceLog.notes ?? 'Servicio automatico'} | Suspendido por bateria baja`,
+          },
+        });
+
+        if (serviceLog.reservationId) {
+          await tx.reservation.update({
+            where: { id: serviceLog.reservationId },
+            data: {
+              status: ReservationStatus.CANCELLED,
+              active: false,
+            },
+          });
+        }
+
+        return;
+      }
 
       if (elapsedMs >= DEMO_SERVICE_DURATION_MS) {
 
@@ -397,9 +607,38 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
 
         await tx.device.update({
           where: { id: serviceLog.deviceId },
-          data: { status: DeviceStatus.AVAILABLE },
+          data: {
+            status: nextBattery <= BATTERY_LOW_THRESHOLD ? DeviceStatus.MAINTENANCE : DeviceStatus.AVAILABLE,
+          },
         });
       }
+    });
+  }
+
+  private async appendMaintenanceTelemetry(device: { id: number; batteryLevel: number }) {
+    const nextBattery = Math.min(100, device.batteryLevel + BATTERY_RECOVERY_STEP);
+    const sensorStatus = nextBattery >= BATTERY_RECOVERY_THRESHOLD ? 'LISTO' : 'RECUPERANDO';
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.telemetrySample.create({
+        data: {
+          batteryLevel: nextBattery,
+          latitude: -6.2591,
+          longitude: -75.5772,
+          sensorStatus,
+          payloadStatus: 'Mantenimiento en curso',
+          deviceId: device.id,
+        },
+      });
+
+      await tx.device.update({
+        where: { id: device.id },
+        data: {
+          batteryLevel: nextBattery,
+          lastKnownLocation: 'Taller de mantenimiento',
+          status: nextBattery >= BATTERY_RECOVERY_THRESHOLD ? DeviceStatus.AVAILABLE : DeviceStatus.MAINTENANCE,
+        },
+      });
     });
   }
 }

@@ -10,6 +10,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/resumen", label: "Resumen" },
+  { href: "/monitoreo", label: "Monitoreo" },
   { href: "/grabaciones", label: "Grabaciones" },
   { href: "/reservas", label: "Reservas" },
   { href: "/dispositivos", label: "Dispositivos" },

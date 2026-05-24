@@ -97,7 +97,7 @@ export class EmailService {
         </div>
 
         <p style="color: #666; font-size: 12px;">
-          Este enlace expirará en 24 horas. Si no solicitó este cambio, ignore este correo.
+          Este enlace expirará en 48 horas. Si no solicitó este cambio, ignore este correo.
         </p>
       </div>
     `;

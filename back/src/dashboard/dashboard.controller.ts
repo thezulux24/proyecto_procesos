@@ -12,6 +12,11 @@ export class DashboardController {
     return this.dashboardService.getOverview();
   }
 
+  @Get('monitoring')
+  getMonitoringOverview() {
+    return this.dashboardService.getMonitoringOverview();
+  }
+
   @Sse('stream')
   stream(@Query('token') _token?: string) {
     return this.dashboardService.stream();
