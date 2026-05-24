@@ -15,7 +15,7 @@ export class ServiceLogsService {
         operator: true,
         reservation: true,
       },
-      orderBy: { id: 'asc' },
+      orderBy: { id: 'desc' },
     });
   }
 

@@ -26,6 +26,26 @@ export class ReservationsService {
     });
   }
 
+  private async createReservationAuditLog(input: {
+    reservation: { id: number; deviceId: number; operatorId: number };
+    action: string;
+    description: string;
+  }) {
+    await this.prisma.serviceLog.create({
+      data: {
+        startTime: new Date(),
+        origin: 'RESERVAS',
+        destination: 'BITACORA',
+        deviceId: input.reservation.deviceId,
+        operatorId: input.reservation.operatorId,
+        reservationId: input.reservation.id,
+        serviceStatus: 'COMPLETED',
+        orderStatus: input.action,
+        notes: input.description,
+      },
+    });
+  }
+
   async findOne(id: number) {
     const reservation = await this.prisma.reservation.findUnique({
       where: { id },
@@ -170,6 +190,16 @@ export class ReservationsService {
         console.error('Failed to create initial service log:', logError);
       }
 
+      try {
+        await this.createReservationAuditLog({
+          reservation: updatedReservation,
+          action: 'CREAR',
+          description: `Se creo la reserva #${updatedReservation.id} para ${updatedReservation.requestedBy}.`,
+        });
+      } catch (logError) {
+        console.error('Failed to create reservation audit log:', logError);
+      }
+
       return updatedReservation;
     } catch (error) {
       console.error('Error processing reservation:', error);
@@ -179,7 +209,7 @@ export class ReservationsService {
   }
 
   async update(id: number, data: UpdateReservationDto) {
-    await this.findOne(id);
+    const currentReservation = await this.findOne(id);
 
     const { device, ...rest } = data;
     const updateData = {
@@ -187,7 +217,42 @@ export class ReservationsService {
       ...(device ? { deviceType: device.toUpperCase() } : {}),
     };
 
-    return this.prisma.reservation.update({ where: { id }, data: updateData });
+    const updatedReservation = await this.prisma.reservation.update({
+      where: { id },
+      data: updateData,
+      include: {
+        device: true,
+        operator: true,
+      },
+    });
+
+    const statusChanged = typeof updateData.status === 'string' && updateData.status !== currentReservation.status;
+    const activeChanged = typeof updateData.active === 'boolean' && updateData.active !== currentReservation.active;
+
+    if (statusChanged || activeChanged) {
+      const action = statusChanged ? 'CAMBIAR_ESTADO' : updatedReservation.active ? 'ACTIVAR' : 'DESACTIVAR';
+      const changes: string[] = [];
+
+      if (statusChanged) {
+        changes.push(`estado ${currentReservation.status} -> ${updatedReservation.status}`);
+      }
+
+      if (activeChanged) {
+        changes.push(`activo ${currentReservation.active ? 'si' : 'no'} -> ${updatedReservation.active ? 'si' : 'no'}`);
+      }
+
+      try {
+        await this.createReservationAuditLog({
+          reservation: updatedReservation,
+          action,
+          description: `Se actualizo la reserva #${updatedReservation.id} (${changes.join(', ')}).`,
+        });
+      } catch (logError) {
+        console.error('Failed to create reservation update audit log:', logError);
+      }
+    }
+
+    return updatedReservation;
   }
 
   async remove(id: number) {
@@ -201,6 +266,16 @@ export class ReservationsService {
     }
 
     const updatedReservation: any = await this.deactivateReservation(reservation);
+
+    try {
+      await this.createReservationAuditLog({
+        reservation: updatedReservation,
+        action: 'ELIMINAR',
+        description: `Se elimino la reserva #${updatedReservation.id}.`,
+      });
+    } catch (logError) {
+      console.error('Failed to create reservation delete audit log:', logError);
+    }
 
     try {
       const requesterEmail = updatedReservation.email;
@@ -245,6 +320,16 @@ export class ReservationsService {
     }
 
     const updatedReservation: any = await this.deactivateReservation(reservation);
+
+    try {
+      await this.createReservationAuditLog({
+        reservation: updatedReservation,
+        action: 'CANCELAR',
+        description: `Se cancelo la reserva #${updatedReservation.id}.`,
+      });
+    } catch (logError) {
+      console.error('Failed to create reservation cancel audit log:', logError);
+    }
 
     try {
       const operator = updatedReservation.operator;

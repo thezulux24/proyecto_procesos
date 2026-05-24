@@ -212,14 +212,19 @@ export default function OperadoresPage() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/operators/${operator.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ active: !operator.active }),
-      });
+      const response = operator.active
+        ? await fetch(`${API_URL}/operators/${operator.id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+        : await fetch(`${API_URL}/operators/${operator.id}/reactivate`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
 
       if (!response.ok) {
         throw new Error("No fue posible actualizar el estado del operador.");

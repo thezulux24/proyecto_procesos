@@ -53,4 +53,11 @@ export class OperatorsController {
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.operatorsService.remove(id);
   }
+
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN')
+  @Post(':id/reactivate')
+  reactivate(@Param('id', ParseIntPipe) id: number) {
+    return this.operatorsService.reactivate(id);
+  }
 }

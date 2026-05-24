@@ -17,7 +17,7 @@ export class OperatorsService {
   findAll(includeInactive = false) {
     return this.prisma.operator.findMany({
       where: includeInactive ? undefined : { active: true },
-      orderBy: { id: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -83,6 +83,12 @@ export class OperatorsService {
       console.error('Failed to send operator password reset email:', error);
     }
 
+    await this.createOperatorAuditLog({
+      operatorId: operator.id,
+      action: 'CREAR',
+      description: `Se creo el operador ${operator.fullName} (${operator.email}).`,
+    });
+
     return operator;
   }
 
@@ -96,17 +102,83 @@ export class OperatorsService {
       }
     }
 
-    return this.prisma.operator.update({
+    const updatedOperator = await this.prisma.operator.update({
       where: { id },
       data,
     });
+
+    await this.createOperatorAuditLog({
+      operatorId: updatedOperator.id,
+      action: 'EDITAR',
+      description: `Se edito el operador ${updatedOperator.fullName} (${updatedOperator.email}).`,
+    });
+
+    return updatedOperator;
   }
 
   async remove(id: number) {
-    await this.findOne(id);
-    return this.prisma.operator.update({
+    const operator = await this.findOne(id);
+    const updatedOperator = await this.prisma.operator.update({
       where: { id },
       data: { active: false },
+    });
+
+    await this.createOperatorAuditLog({
+      operatorId: updatedOperator.id,
+      action: 'ELIMINAR',
+      description: `Se desactivo el operador ${operator.fullName} (${operator.email}).`,
+    });
+
+    return updatedOperator;
+  }
+
+  async reactivate(id: number) {
+    const operator = await this.findOne(id);
+    const updatedOperator = await this.prisma.operator.update({
+      where: { id },
+      data: { active: true },
+    });
+
+    await this.createOperatorAuditLog({
+      operatorId: updatedOperator.id,
+      action: 'ACTIVAR',
+      description: `Se activo el operador ${operator.fullName} (${operator.email}).`,
+    });
+
+    return updatedOperator;
+  }
+
+  private async createOperatorAuditLog(input: { operatorId: number; action: string; description: string }) {
+    const auditDevice = await this.prisma.device.findFirst({
+      where: { active: true },
+      orderBy: { id: 'asc' },
+    });
+
+    if (!auditDevice) {
+      console.warn(`No active device available to write operator audit log: ${input.action}`);
+      return;
+    }
+
+    const operator = await this.prisma.operator.findUnique({
+      where: { id: input.operatorId },
+    });
+
+    if (!operator) {
+      return;
+    }
+
+    await this.prisma.serviceLog.create({
+      data: {
+        startTime: new Date(),
+        origin: 'OPERADORES',
+        destination: 'BITACORA',
+        deviceId: auditDevice.id,
+        operatorId: operator.id,
+        serviceStatus: 'COMPLETED',
+        orderStatus: input.action,
+        sensorSummary: input.description,
+        notes: input.description,
+      },
     });
   }
 }
