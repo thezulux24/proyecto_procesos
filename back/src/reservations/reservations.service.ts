@@ -26,7 +26,7 @@ export class ReservationsService {
     });
   }
 
-  private async createReservationAuditLog(input: {
+  async recordAuditLog(input: {
     reservation: { id: number; deviceId: number; operatorId: number };
     action: string;
     description: string;
@@ -191,7 +191,7 @@ export class ReservationsService {
       }
 
       try {
-        await this.createReservationAuditLog({
+        await this.recordAuditLog({
           reservation: updatedReservation,
           action: 'CREAR',
           description: `Se creo la reserva #${updatedReservation.id} para ${updatedReservation.requestedBy}.`,
@@ -242,7 +242,7 @@ export class ReservationsService {
       }
 
       try {
-        await this.createReservationAuditLog({
+        await this.recordAuditLog({
           reservation: updatedReservation,
           action,
           description: `Se actualizo la reserva #${updatedReservation.id} (${changes.join(', ')}).`,
@@ -268,7 +268,7 @@ export class ReservationsService {
     const updatedReservation: any = await this.deactivateReservation(reservation);
 
     try {
-      await this.createReservationAuditLog({
+      await this.recordAuditLog({
         reservation: updatedReservation,
         action: 'ELIMINAR',
         description: `Se elimino la reserva #${updatedReservation.id}.`,
@@ -322,7 +322,7 @@ export class ReservationsService {
     const updatedReservation: any = await this.deactivateReservation(reservation);
 
     try {
-      await this.createReservationAuditLog({
+      await this.recordAuditLog({
         reservation: updatedReservation,
         action: 'CANCELAR',
         description: `Se cancelo la reserva #${updatedReservation.id}.`,

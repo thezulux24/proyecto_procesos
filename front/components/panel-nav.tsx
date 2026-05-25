@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 type NavItem = {
@@ -20,10 +21,36 @@ const navItems: NavItem[] = [
 
 export function PanelNav() {
   const pathname = usePathname();
+  const [currentRole, setCurrentRole] = useState("");
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem("auth_user");
+    if (!rawUser) {
+      setCurrentRole("");
+      return;
+    }
+
+    try {
+      const parsedUser = JSON.parse(rawUser) as { role?: string };
+      setCurrentRole(parsedUser.role?.toUpperCase() ?? "");
+    } catch {
+      setCurrentRole("");
+    }
+  }, []);
+
+  const isAdmin = currentRole === "ADMIN";
+
+  const visibleNavItems = navItems.filter((item) => {
+    if (isAdmin) {
+      return true;
+    }
+
+    return item.href !== "/monitoreo" && item.href !== "/grabaciones";
+  });
 
   return (
     <nav className="nav-list" aria-label="Navegacion principal">
-      {navItems.map((item) => {
+      {visibleNavItems.map((item) => {
         const isDisabled = item.href === "#";
         const isActive =
           !isDisabled &&

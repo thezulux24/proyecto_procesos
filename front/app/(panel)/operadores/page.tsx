@@ -67,10 +67,13 @@ export default function OperadoresPage() {
   const [operators, setOperators] = useState<OperatorItem[]>([]);
   const [form, setForm] = useState<OperatorFormState>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [currentRole, setCurrentRole] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const isAdmin = currentRole === "ADMIN";
 
   const formTitle = useMemo(
     () => (editingId ? `Editar operador #${editingId}` : "Crear operador"),
@@ -78,6 +81,16 @@ export default function OperadoresPage() {
   );
 
   useEffect(() => {
+    const rawUser = localStorage.getItem("auth_user");
+    if (rawUser) {
+      try {
+        const parsedUser = JSON.parse(rawUser) as { role?: string };
+        setCurrentRole(parsedUser.role?.toUpperCase() ?? "");
+      } catch {
+        setCurrentRole("");
+      }
+    }
+
     void loadOperators();
   }, []);
 
@@ -136,6 +149,12 @@ export default function OperadoresPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!isAdmin) {
+      setError("No tienes permisos para crear o modificar operadores.");
+      return;
+    }
+
     setMessage(null);
     setError(null);
 
@@ -202,6 +221,11 @@ export default function OperadoresPage() {
   }
 
   async function toggleActive(operator: OperatorItem) {
+    if (!isAdmin) {
+      setError("No tienes permisos para modificar operadores.");
+      return;
+    }
+
     const token = getAuthToken();
     if (!token) {
       setError("No hay sesion activa para cambiar el estado.");
@@ -240,6 +264,11 @@ export default function OperadoresPage() {
   }
 
   async function removeOperator(operator: OperatorItem) {
+    if (!isAdmin) {
+      setError("No tienes permisos para modificar operadores.");
+      return;
+    }
+
     const token = getAuthToken();
     if (!token) {
       setError("No hay sesion activa para eliminar operadores.");
@@ -276,74 +305,82 @@ export default function OperadoresPage() {
         <header className="operators-head">
           <p className="operators-kicker">Administracion</p>
           <h2 className="operators-title">Gestion de operadores</h2>
-          <p className="operators-copy">Crea, edita, activa o desactiva operadores desde este panel.</p>
+          <p className="operators-copy">
+            {isAdmin
+              ? "Crea, edita, activa o desactiva operadores desde este panel."
+              : "Solo puedes visualizar la lista de operadores."}
+          </p>
         </header>
 
-        <form className="operators-form" onSubmit={handleSubmit}>
-          <h3 className="operators-form-title">{formTitle}</h3>
+        {isAdmin ? (
+          <form className="operators-form" onSubmit={handleSubmit}>
+            <h3 className="operators-form-title">{formTitle}</h3>
 
-          <div className="operators-form-grid">
-            <label className="operators-field" htmlFor="operatorName">
-              Nombre completo
-              <input
-                id="operatorName"
-                type="text"
-                value={form.fullName}
-                onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))}
-                required
-              />
-            </label>
+            <div className="operators-form-grid">
+              <label className="operators-field" htmlFor="operatorName">
+                Nombre completo
+                <input
+                  id="operatorName"
+                  type="text"
+                  value={form.fullName}
+                  onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))}
+                  required
+                />
+              </label>
 
-            <label className="operators-field" htmlFor="operatorEmail">
-              Correo
-              <input
-                id="operatorEmail"
-                type="email"
-                value={form.email}
-                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-                required
-              />
-            </label>
+              <label className="operators-field" htmlFor="operatorEmail">
+                Correo
+                <input
+                  id="operatorEmail"
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                  required
+                />
+              </label>
 
-            <label className="operators-field" htmlFor="operatorRole">
-              Rol operativo
-              <select
-                id="operatorRole"
-                value={form.role}
-                onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as OperatorRole }))}
-              >
-                <option value="TECHNICIAN">TECHNICIAN</option>
-                <option value="SUPERVISOR">SUPERVISOR</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
-            </label>
+              <label className="operators-field" htmlFor="operatorRole">
+                Rol operativo
+                <select
+                  id="operatorRole"
+                  value={form.role}
+                  onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as OperatorRole }))}
+                >
+                  <option value="TECHNICIAN">TECHNICIAN</option>
+                  <option value="SUPERVISOR">SUPERVISOR</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
+              </label>
 
-            <label className="operators-checkbox" htmlFor="operatorActive">
-              <input
-                id="operatorActive"
-                type="checkbox"
-                checked={form.active}
-                onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))}
-                disabled={editingId === null}
-              />
-              Operador activo
-            </label>
-          </div>
+              <label className="operators-checkbox" htmlFor="operatorActive">
+                <input
+                  id="operatorActive"
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))}
+                  disabled={editingId === null}
+                />
+                Operador activo
+              </label>
+            </div>
 
-          <div className="operators-actions">
-            <button type="submit" className="operators-button" disabled={isSaving}>
-              {isSaving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear operador"}
-            </button>
-            {editingId ? (
-              <button type="button" className="operators-button operators-button-muted" onClick={resetForm}>
-                Cancelar edicion
+            <div className="operators-actions">
+              <button type="submit" className="operators-button" disabled={isSaving}>
+                {isSaving ? "Guardando..." : editingId ? "Guardar cambios" : "Crear operador"}
               </button>
-            ) : null}
-          </div>
+              {editingId ? (
+                <button type="button" className="operators-button operators-button-muted" onClick={resetForm}>
+                  Cancelar edicion
+                </button>
+              ) : null}
+            </div>
 
-          {error ? <p className="operators-error">{error}</p> : null}
-          {message ? <p className="operators-success">{message}</p> : null}
-        </form>
+            {error ? <p className="operators-error">{error}</p> : null}
+            {message ? <p className="operators-success">{message}</p> : null}
+          </form>
+        ) : (
+          <p className="operators-empty">Vista de solo lectura.</p>
+        )}
       </article>
 
       <article className="operators-card operators-table-card">
@@ -364,7 +401,7 @@ export default function OperadoresPage() {
                   <th>Correo</th>
                   <th>Rol</th>
                   <th>Estado</th>
-                  <th>Acciones</th>
+                  {isAdmin ? <th>Acciones</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -374,38 +411,40 @@ export default function OperadoresPage() {
                     <td>{operator.email}</td>
                     <td>{operator.role}</td>
                     <td>{operator.active ? "Activo" : "Inactivo"}</td>
-                    <td className="operators-row-actions">
-                      <button
-                        type="button"
-                        className="operators-link operators-icon-button"
-                        onClick={() => startEdit(operator)}
-                        aria-label={`Editar ${operator.fullName}`}
-                        title={`Editar ${operator.fullName}`}
-                      >
-                        <EditIcon />
-                        <span className="sr-only">Editar</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="operators-link operators-icon-button operators-icon-button-toggle"
-                        onClick={() => toggleActive(operator)}
-                        aria-label={operator.active ? `Desactivar ${operator.fullName}` : `Activar ${operator.fullName}`}
-                        title={operator.active ? `Desactivar ${operator.fullName}` : `Activar ${operator.fullName}`}
-                      >
-                        <PowerIcon active={operator.active} />
-                        <span className="sr-only">{operator.active ? "Desactivar" : "Activar"}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="operators-link operators-icon-button operators-link-danger"
-                        onClick={() => removeOperator(operator)}
-                        aria-label={`Eliminar ${operator.fullName}`}
-                        title={`Eliminar ${operator.fullName}`}
-                      >
-                        <DeleteIcon />
-                        <span className="sr-only">Eliminar</span>
-                      </button>
-                    </td>
+                    {isAdmin ? (
+                      <td className="operators-row-actions">
+                        <button
+                          type="button"
+                          className="operators-link operators-icon-button"
+                          onClick={() => startEdit(operator)}
+                          aria-label={`Editar ${operator.fullName}`}
+                          title={`Editar ${operator.fullName}`}
+                        >
+                          <EditIcon />
+                          <span className="sr-only">Editar</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="operators-link operators-icon-button operators-icon-button-toggle"
+                          onClick={() => toggleActive(operator)}
+                          aria-label={operator.active ? `Desactivar ${operator.fullName}` : `Activar ${operator.fullName}`}
+                          title={operator.active ? `Desactivar ${operator.fullName}` : `Activar ${operator.fullName}`}
+                        >
+                          <PowerIcon active={operator.active} />
+                          <span className="sr-only">{operator.active ? "Desactivar" : "Activar"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="operators-link operators-icon-button operators-link-danger"
+                          onClick={() => removeOperator(operator)}
+                          aria-label={`Eliminar ${operator.fullName}`}
+                          title={`Eliminar ${operator.fullName}`}
+                        >
+                          <DeleteIcon />
+                          <span className="sr-only">Eliminar</span>
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

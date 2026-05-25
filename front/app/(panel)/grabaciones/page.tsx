@@ -43,6 +43,24 @@ export default function GrabacionesPage() {
   const [selectedDate, setSelectedDate] = useState("");
   const [serviceQuery, setServiceQuery] = useState("");
   const [appliedServiceQuery, setAppliedServiceQuery] = useState("");
+  const [currentRole, setCurrentRole] = useState("");
+
+  const isAdmin = currentRole === "ADMIN";
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem("auth_user");
+    if (!rawUser) {
+      setCurrentRole("");
+      return;
+    }
+
+    try {
+      const parsedUser = JSON.parse(rawUser) as { role?: string };
+      setCurrentRole(parsedUser.role?.toUpperCase() ?? "");
+    } catch {
+      setCurrentRole("");
+    }
+  }, []);
 
   const serviceOptions = useMemo(() => {
     const uniqueServices = new Map<number, string>();
@@ -115,6 +133,18 @@ export default function GrabacionesPage() {
       cancelled = true;
     };
   }, []);
+
+  if (!isAdmin) {
+    return (
+      <section className="recordings-page">
+        <article className="panel-card">
+          <p className="page-kicker">Acceso restringido</p>
+          <h2 className="page-title">Grabaciones disponible solo para ADMIN</h2>
+          <p className="panel-description">Tu rol actual no tiene permiso para ver esta sección.</p>
+        </article>
+      </section>
+    );
+  }
 
   return (
     <section className="recordings-page">

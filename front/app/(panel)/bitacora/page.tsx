@@ -190,6 +190,17 @@ export default function Page() {
           ]);
 
           (autoTable as any)(doc, { head, body, startY: 80, margin: { left: 40, right: 40 }, styles: { fontSize: 9 } });
+        } else if (activeSection === "operators") {
+          const head = [["ID", "Fecha", "Operador", "Acción", "Detalle"]];
+          const body = operatorLogs.map((it) => [
+            String(it.id),
+            fmt(it.startTime),
+            it.operator?.fullName ?? "-",
+            it.orderStatus ?? "-",
+            it.notes ?? "-",
+          ]);
+
+          (autoTable as any)(doc, { head, body, startY: 80, margin: { left: 40, right: 40 }, styles: { fontSize: 9 } });
         } else {
           const head = [["ID", "Salida", "Regreso", "Dispositivo", "Operador", "Reserva", "Estado"]];
           const body = filtered.map((it) => [
@@ -367,7 +378,7 @@ export default function Page() {
           ? "Aquí se muestran los registros de dispositivos, servicios y telemetría de la simulación."
           : activeSection === "reservations"
             ? "Aquí se muestran las altas, cambios de estado y eliminaciones de reservas."
-          : null}
+            : "Aquí se muestran los cambios de estado de los operadores y cada acción queda registrada."}
       </div>
 
       {error ? <div style={{ color: "#a82424" }}>{error}</div> : null}
@@ -456,26 +467,26 @@ export default function Page() {
               <thead>
                 <tr style={{ textAlign: "left", borderBottom: "1px solid #eef5fb" }}>
                   <th style={{ padding: "8px 6px" }}>#</th>
-                  <th style={{ padding: "8px 6px" }}>Nombre</th>
-                  <th style={{ padding: "8px 6px" }}>Correo</th>
-                  <th style={{ padding: "8px 6px" }}>Hora de creación</th>
-                  <th style={{ padding: "8px 6px" }}>Estado</th>
+                  <th style={{ padding: "8px 6px" }}>Fecha</th>
+                  <th style={{ padding: "8px 6px" }}>Operador</th>
+                  <th style={{ padding: "8px 6px" }}>Acción</th>
+                  <th style={{ padding: "8px 6px" }}>Detalle</th>
                 </tr>
               </thead>
               <tbody>
-                {operators.map((operator) => (
-                  <tr key={operator.id} style={{ borderBottom: "1px solid #f4f7fb" }}>
-                    <td style={{ padding: "10px 6px", width: 48 }}>{operator.id}</td>
-                    <td style={{ padding: "10px 6px" }}>{operator.fullName}</td>
-                    <td style={{ padding: "10px 6px" }}>{operator.email}</td>
-                    <td style={{ padding: "10px 6px", width: 180 }}>{fmt(operator.createdAt)}</td>
-                    <td style={{ padding: "10px 6px", width: 120 }}>{getOperatorState(operator)}</td>
+                {operatorLogs.map((log) => (
+                  <tr key={log.id} style={{ borderBottom: "1px solid #f4f7fb" }}>
+                    <td style={{ padding: "10px 6px", width: 48 }}>{log.id}</td>
+                    <td style={{ padding: "10px 6px", width: 160 }}>{fmt(log.startTime)}</td>
+                    <td style={{ padding: "10px 6px" }}>{log.operator?.fullName ?? "-"}</td>
+                    <td style={{ padding: "10px 6px", width: 140 }}>{log.orderStatus ?? "-"}</td>
+                    <td style={{ padding: "10px 6px" }}>{log.notes ?? "-"}</td>
                   </tr>
                 ))}
-                {!loading && operators.length === 0 ? (
+                {!loading && operatorLogs.length === 0 ? (
                   <tr>
                     <td colSpan={5} style={{ padding: 12, color: "#6b7f95" }}>
-                      No hay operadores registrados.
+                      No hay cambios registrados para operadores.
                     </td>
                   </tr>
                 ) : null}

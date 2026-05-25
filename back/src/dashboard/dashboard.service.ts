@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CloudService } from '../cloud/cloud.service';
 import { QrService } from '../common/utils/qr.service';
 import { EmailService } from '../common/utils/email.service';
+import { ReservationsService } from '../reservations/reservations.service';
 
 type DashboardOverview = {
   generatedAt: string;
@@ -115,6 +116,7 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
     private readonly cloudService: CloudService,
     private readonly qrService: QrService,
     private readonly emailService: EmailService,
+    private readonly reservationsService: ReservationsService,
   ) {}
 
   onModuleInit() {
@@ -377,7 +379,7 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
         active: true,
         status: DeviceStatus.AVAILABLE,
         batteryLevel: {
-          gte: BATTERY_RECOVERY_THRESHOLD,
+          gte: BATTERY_LOW_THRESHOLD,
         },
       },
       orderBy: { updatedAt: 'asc' },
@@ -402,6 +404,8 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
     const createdServices: Array<{
       serviceId: number;
       reservationId: number;
+      deviceId: number;
+      operatorId: number;
       operatorEmail: string | null;
       deviceName: string;
       startAt: Date;
@@ -450,6 +454,8 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
         createdServices.push({
           serviceId: service.id,
           reservationId: reservation.id,
+          deviceId: device.id,
+          operatorId: operator.id,
           operatorEmail: operator.email,
           deviceName: device.name,
           startAt: startedAt,
@@ -475,6 +481,16 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
             qrCode: qrCode.toString('base64'),
             qrDataUrl,
           },
+        });
+
+        await this.reservationsService.recordAuditLog({
+          reservation: {
+            id: created.reservationId,
+            deviceId: created.deviceId,
+            operatorId: created.operatorId,
+          },
+          action: 'CREAR',
+          description: `La simulacion creo la reserva #${created.reservationId} para el dispositivo ${created.deviceName}.`,
         });
 
         if (created.operatorEmail) {
@@ -521,6 +537,13 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
     const sensorStatus = nextBattery <= 25 ? 'ATENCION' : sampleCount % 2 === 0 ? 'OK' : 'ESTABLE';
     const payloadStatus = serviceLog.device.type === 'DRONE' ? 'Grabacion en curso' : 'Entrega en curso';
     const nextStatus = nextBattery <= BATTERY_LOW_THRESHOLD ? DeviceStatus.MAINTENANCE : DeviceStatus.IN_SERVICE;
+    let reservationAuditLog:
+      | {
+          reservation: { id: number; deviceId: number; operatorId: number };
+          action: string;
+          description: string;
+        }
+      | null = null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.telemetrySample.create({
@@ -567,6 +590,16 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
               active: false,
             },
           });
+
+          reservationAuditLog = {
+            reservation: {
+              id: serviceLog.reservationId,
+              deviceId: serviceLog.deviceId,
+              operatorId: serviceLog.operatorId,
+            },
+            action: 'CAMBIAR_ESTADO',
+            description: `La simulacion cambio la reserva #${serviceLog.reservationId} a CANCELLED por bateria baja.`,
+          };
         }
 
         return;
@@ -590,6 +623,16 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
             where: { id: serviceLog.reservationId },
             data: { status: ReservationStatus.COMPLETED },
           });
+
+          reservationAuditLog = {
+            reservation: {
+              id: serviceLog.reservationId,
+              deviceId: serviceLog.deviceId,
+              operatorId: serviceLog.operatorId,
+            },
+            action: 'CAMBIAR_ESTADO',
+            description: `La simulacion cambio la reserva #${serviceLog.reservationId} a COMPLETED al finalizar el servicio.`,
+          };
         }
 
         const cloudUrl = this.cloudService.buildVideoUrl(serviceLog.id);
@@ -613,6 +656,10 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
         });
       }
     });
+
+    if (reservationAuditLog) {
+      await this.reservationsService.recordAuditLog(reservationAuditLog);
+    }
   }
 
   private async appendMaintenanceTelemetry(device: { id: number; batteryLevel: number }) {

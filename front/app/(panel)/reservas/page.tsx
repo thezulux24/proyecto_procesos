@@ -56,6 +56,7 @@ export default function ReservasPage() {
   const [documentId, setDocumentId] = useState("");
   const [currentRole, setCurrentRole] = useState<string>("");
   const [reservations, setReservations] = useState<ReservationListItem[]>([]);
+  const [reservationFilterDate, setReservationFilterDate] = useState("");
   const [selectedForDelete, setSelectedForDelete] = useState<ReservationListItem | null>(null);
   const [isLoadingReservations, setIsLoadingReservations] = useState(false);
 
@@ -69,6 +70,10 @@ export default function ReservasPage() {
   const previewAssignedUnit =
     assignedUnit ??
     (serviceType === "ROBOT" ? "Robot (pendiente)" : serviceType === "DRON" ? "Dron (pendiente)" : "Sin asignacion");
+
+  const filteredReservations = reservationFilterDate
+    ? reservations.filter((item) => item.startAt.slice(0, 10) === reservationFilterDate)
+    : reservations;
 
   function getAuthToken() {
     return localStorage.getItem("auth_token");
@@ -336,6 +341,29 @@ export default function ReservasPage() {
             <p className="reservation-copy">Como administrador solo puedes visualizar y eliminar reservas.</p>
           </header>
 
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+            <label className="reservation-field" htmlFor="reservationFilterDate" style={{ minWidth: 220, marginBottom: 0 }}>
+              Filtrar por fecha
+              <input
+                id="reservationFilterDate"
+                name="reservationFilterDate"
+                type="date"
+                value={reservationFilterDate}
+                onChange={(event) => setReservationFilterDate(event.target.value)}
+              />
+            </label>
+
+            <button
+              type="button"
+              className="reservation-button reservation-button-muted"
+              onClick={() => setReservationFilterDate("")}
+              disabled={!reservationFilterDate}
+              style={{ alignSelf: "end" }}
+            >
+              Limpiar filtro
+            </button>
+          </div>
+
           {error ? <p className="reservation-error">{error}</p> : null}
 
           {isLoadingReservations ? <p className="reservation-copy">Cargando reservas...</p> : null}
@@ -344,7 +372,11 @@ export default function ReservasPage() {
             <p className="reservation-copy">No hay reservas registradas.</p>
           ) : null}
 
-          {!isLoadingReservations && reservations.length > 0 ? (
+          {!isLoadingReservations && reservations.length > 0 && filteredReservations.length === 0 ? (
+            <p className="reservation-copy">No hay reservas para la fecha seleccionada.</p>
+          ) : null}
+
+          {!isLoadingReservations && filteredReservations.length > 0 ? (
             <div className="reservation-admin-table-wrap">
               <table className="reservation-admin-table">
                 <thead>
@@ -359,7 +391,7 @@ export default function ReservasPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {reservations.map((item) => (
+                  {filteredReservations.map((item) => (
                     <tr key={item.id}>
                       <td>{item.id}</td>
                       <td>{item.object}</td>

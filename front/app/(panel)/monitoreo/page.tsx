@@ -128,6 +128,24 @@ export default function MonitoreoPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [currentRole, setCurrentRole] = useState("");
+
+  const isAdmin = currentRole === "ADMIN";
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem("auth_user");
+    if (!rawUser) {
+      setCurrentRole("");
+      return;
+    }
+
+    try {
+      const parsedUser = JSON.parse(rawUser) as { role?: string };
+      setCurrentRole(parsedUser.role?.toUpperCase() ?? "");
+    } catch {
+      setCurrentRole("");
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,6 +210,18 @@ export default function MonitoreoPage() {
       }
     };
   }, []);
+
+  if (!isAdmin) {
+    return (
+      <section className="monitoring-page">
+        <article className="panel-card">
+          <p className="panel-kicker">Acceso restringido</p>
+          <h2 className="panel-title">Monitoreo disponible solo para ADMIN</h2>
+          <p className="panel-description">Tu rol actual no tiene permiso para ver esta sección.</p>
+        </article>
+      </section>
+    );
+  }
 
   const selectedDevice = overview.devices.find((device) => device.id === selectedDeviceId) ?? null;
   const updatedLabel = lastSyncedAt ? formatExactTime(lastSyncedAt) : "Esperando datos";
