@@ -1,19 +1,14 @@
 # Sistema Centralizado de Transporte Universitario
 
-Guía práctica para ejecutar el proyecto completo: base de datos, backend, frontend, simulación automática, videos demo y correo con Mailpit en Docker.
+Este proyecto implementa un sistema centralizado para gestionar el uso de robots y drones dentro de una universidad. Actualmente, estos dispositivos son operados manualmente, lo que limita la atención de múltiples solicitudes al mismo tiempo. Por ello, se propone desarrollar un software que automatice la configuración y gestión de los dispositivos, mejorando la eficiencia del servicio.
 
 ## Requisitos
 
-- Node.js 18 o superior.
-- npm 9 o superior.
+- Node.js 18+ y npm 9+.
 - Docker Desktop activo.
-- Puerto `5433` libre para PostgreSQL.
-- Puerto `3000` libre para el frontend.
-- Puerto `3001` libre para el backend.
-- Puerto `1025` libre para Mailpit.
-- Puerto `8025` libre para la interfaz de Mailpit.
+- Puertos libres: 5433 (PostgreSQL), 3000 (frontend), 3001 (backend), 1025 y 8025 (Mailpit).
 
-## Paso a paso
+## Guía de ejecución
 
 1. Levanta la base de datos:
 
@@ -21,7 +16,7 @@ Guía práctica para ejecutar el proyecto completo: base de datos, backend, fron
 docker compose up -d
 ```
 
-2. En `back/.env`, deja esta configuración mínima para ejecutar todo:
+2. En el archivo `back/.env`, se debe establecer como mínimo la siguiente configuración para garantizar la correcta ejecución del proyecto:
 
 ```env
 DATABASE_URL="postgresql://user_pos:pos_password_2026@localhost:5433/pos_db?schema=public"
@@ -33,36 +28,44 @@ FRONTEND_URL=http://localhost:3000
 JWT_SECRET=dev-secret
 ```
 
-3. Instala dependencias:
+La variable `DEMO_AUTOPILOT` controla la ejecución automática de la simulación del sistema.
+- Si su valor es `true`, la simulación se ejecutará automáticamente.
+- Si su valor es `false`, la simulación permanecerá deshabilitada.
+
+3. Instalar dependencias:
 
 ```powershell
 cd back
 npm install
+```
+
+```powershell
 cd ../front
 npm install
 ```
 
-4. Prepara Prisma y la base de datos:
+4. Preparar Prisma y la base de datos:
 
 ```powershell
 cd ../back
 npm run db:setup
 ```
 
-5. Inicia el backend:
+5. Iniciar el backend:
 
 ```powershell
+cd back
 npm run start:dev
 ```
 
-6. En otra terminal, inicia el frontend:
+6. En otra terminal, iniciar el frontend:
 
 ```powershell
 cd ../front
 npm run dev
 ```
 
-7. Abre el panel en:
+7. Abrir el panel en siguiente puerto:
 
 ```text
 http://localhost:3000
@@ -80,15 +83,9 @@ Con eso el backend:
 - Cierra servicios automáticamente.
 - Crea grabaciones de video para servicios completados.
 
-Las vistas nuevas quedan en:
-
-- `/resumen`
-- `/grabaciones`
-- `/resumen/video/:videoId`
-
 ## Correo en Docker
 
-Para revisar los correos locales, levanta Mailpit con Docker. 
+Para revisar los correos locales, se hace uso de Mailpit con Docker. 
 
 ```powershell
 docker run -d --name mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit:latest
@@ -101,30 +98,16 @@ docker rm -f mailpit
 ```
 Una vez validado, volver a ejecutar el comando para levantar el contenedor.
 
-Eso deja:
+El correo se encuentra en el siguiente puerto:
 
 - SMTP en `localhost:1025`
 - Interfaz web en `http://localhost:8025`
 
+## Base de datos
 
-## Datos de prueba
-
-Credenciales creadas por el seed:
-
-- Admin: `admin@universidad.edu` / `admin123456`
-- Operador: `operador@universidad.edu` / `operador123456`
-
-## Si quieres reiniciar todo
+Para visualizar la base de datos se hace uso del siguiente comando:
 
 ```powershell
 cd back
-npm run db:setup
-npm run start:dev
-```
-
-En otra terminal:
-
-```powershell
-cd front
-npm run dev
+npx prisma studio
 ```
